@@ -1,7 +1,12 @@
 # 🐑 Theta Shepherd
 
+![Theta Shepherd](docs/cover.png)
+
 An autonomous options premium-selling agent for the **Alpaca AI Trading Agents Hackathon**
 (lablab.ai × Alpaca, Aug 28 – Sep 4 2026).
+**Live dashboard:** https://rogerdemello.github.io/theta-shepherd/
+
+[![Dashboard](docs/dashboard_screenshot.png)](https://rogerdemello.github.io/theta-shepherd/)
 
 Theta Shepherd herds a flock of defined-risk credit spreads on liquid ETFs (SPY, QQQ):
 a quantitative engine scouts delta-targeted verticals, an **AI Trading Committee**
