@@ -1,0 +1,67 @@
+dashboard_template.html
+  s_5582fd90f01517::t_882450e5ec4ee2 199-200,202,204
+  s_5582fd90f01517::t_4679cfd359e2a5 235
+  s_5582fd90f01517::t_022e911066eef9 245-261
+  s_5582fd90f01517::t_e6747ad0294c0b 276,282-299,301
+dashboard.py
+  s_5582fd90f01517::t_9fab640a12bd4a 175-194
+  s_5582fd90f01517::t_8d9ad2922c327b 207-208,211
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "02317b512c9081b12859941c60267c4eac0506cd",
+  "branch": "main",
+  "prompts": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:44581c7f68046c82d936631e528ce75b34ca6ea3c266e76f86de573447e68278",
+      "total_additions": 111,
+      "total_deletions": 5,
+      "accepted_lines": 212,
+      "overriden_lines": 87
+    }
+  },
+  "sessions": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:44581c7f68046c82d936631e528ce75b34ca6ea3c266e76f86de573447e68278",
+      "stats": {
+        "total_additions": 111,
+        "total_deletions": 5,
+        "accepted_lines": 212,
+        "overriden_lines": 87,
+        "files": {
+          "dashboard.py": {
+            "total_additions": 23,
+            "total_deletions": 0,
+            "accepted_lines": 23,
+            "overriden_lines": 0
+          },
+          "dashboard_template.html": {
+            "total_additions": 42,
+            "total_deletions": 2,
+            "accepted_lines": 42,
+            "overriden_lines": 0
+          },
+          "docs/dashboard.html": {
+            "total_additions": 46,
+            "total_deletions": 3,
+            "accepted_lines": 147,
+            "overriden_lines": 87
+          }
+        }
+      }
+    }
+  }
+}
