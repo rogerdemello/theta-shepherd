@@ -67,13 +67,13 @@ During market days, run cycles every ~20–30 min (`--loop` or Task Scheduler �
 - README: mermaid architecture diagram + satellite paragraph.
 - `presentation/video_script.md` (3-min, timed, 【】 placeholders) + `presentation/slides.md` (7 slides).
 - **Cover image**: `docs/cover.png` (1280×720, regenerate from `presentation/cover.html` via headless Edge).
-- Dashboard artifact republished (user re-approved artifacts): **https://claude.ai/code/artifact/d76b05de-8fd8-4a5a-9525-52c3e5fe81f8** (older e5ececa1… URL is dead-ended; use d76b05de or pass it as `url` when updating from a new session). GitHub Pages also live: https://rogerdemello.github.io/theta-shepherd/
+- **Claude artifacts are OUT** (user asked to delete them — deletion only possible by user at claude.ai/code/artifacts; do NOT publish new ones). Demo URL for the submission is GitHub Pages only: **https://rogerdemello.github.io/theta-shepherd/** (regenerate with `python dashboard.py`, commit docs/, push — Pages redeploys automatically).
 
 ## Still TODO
 
 - Optional: Featherless AI persona (partner tech; needs user to claim $25 credits)
-- Mon–Wed: daily verify fills / regenerate+push dashboard + republish artifact / post; Wed flatten check; Thu video+slides+writeup+regenerate keys+submit
-- User actions pending: post #1 and #2 on X/LinkedIn
+- Mon–Wed: daily verify fills / regenerate+push dashboard (Pages) / post; Wed flatten check; Thu video+slides+writeup+regenerate keys+submit
+- User actions pending: post #1 and #2 on X/LinkedIn; delete the two private dashboard artifacts at claude.ai/code/artifacts
 
 ## Done ✅ (Fri Aug 28)
 
