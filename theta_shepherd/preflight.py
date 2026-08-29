@@ -20,7 +20,8 @@ from .journal import log_event
 console = Console()
 
 STALE_AFTER = timedelta(minutes=30)
-SCHEDULED_TASKS = ["ThetaShepherd Cycle", "ThetaShepherd Retro", "ThetaShepherd Health"]
+SCHEDULED_TASKS = ["ThetaShepherd Cycle", "ThetaShepherd Retro",
+                   "ThetaShepherd Health", "ThetaShepherd Publish"]
 
 
 def _check_env() -> tuple[bool, str]:

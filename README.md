@@ -143,6 +143,14 @@ prevents overlapping runs from double-submitting, exit orders escalate their
 price pad until stops fill, and `touch STOP` in the repo root halts new
 entries (exits keep managing) — delete it to resume.
 
+**Architecture shape:** the backend is a headless scheduled service (four
+Windows scheduled tasks: trading cycles, nightly retro, self-healing health
+watchdog, dashboard publisher) with an append-only JSONL journal as its
+database; the frontend is a *generated* static site — the dashboard is
+rebuilt from the journal and pushed to GitHub Pages every 30 minutes during
+the session and after every close. No live server means the demo URL has
+100% uptime regardless of whether the trading machine is even on.
+
 ```powershell
 ```
 

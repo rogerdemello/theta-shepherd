@@ -105,6 +105,10 @@ New `--dry-run` mode (full pipeline rehearsal, zero side effects — verified by
 - Committee live debate: rejected QQQ adds (concentration — Risk Officer), approved SPY 775/780 x9 ($3.7k) + IWM 299/302 x7 ($1.8k) for diversification. Sizing within per-trade $4k and $10k ladder ✓.
 - pytest 84 ✓, preflight 8/8 GO ✓, health OK ✓, dashboard regenerated ✓.
 
+## Done Sat Aug 29 block 7 ✅ — near-live frontend
+
+4th scheduled task "ThetaShepherd Publish" (Mon–Fri 19:40 IST, every 30 min ×6h): regenerates dashboard + pushes docs/ → the Pages URL is near-live during sessions without any server. Preflight now checks all 4 tasks (GO ✓). Architecture framing documented in README (headless scheduled backend + generated static frontend = 100% demo uptime).
+
 ## Still TODO
 
 - ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.
