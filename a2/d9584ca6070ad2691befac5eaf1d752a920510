@@ -1,0 +1,215 @@
+CONTINUE.md
+  s_b075cd29681ced::t_2dc99d7d99c2b5 1-96
+theta_shepherd/committee.py
+  s_5582fd90f01517::t_1ebbeb8cd6d866 1-120
+tests/test_strategy.py
+  s_5582fd90f01517::t_aca6e3baafd1a1 3-12,14,17-44
+  s_5582fd90f01517::t_5be9f3b8cd3273 15-16
+  s_5582fd90f01517::t_9310eee558aab7 1-2
+  s_5582fd90f01517::t_882d3db96e6c41 13
+tests/test_committee.py
+  s_5582fd90f01517::t_f5eebd31ed6e14 1-57
+tests/test_market.py
+  s_5582fd90f01517::t_f342e89caa70a4 1-25
+tests/test_retro.py
+  s_5582fd90f01517::t_098a0498711ffb 1-29
+tests/test_ladder.py
+  s_5582fd90f01517::t_3e37a9f7284628 1-53
+theta_shepherd/config.py
+  s_5582fd90f01517::t_5f29746239ee02 50-53
+theta_shepherd/llm.py
+  s_5582fd90f01517::t_bbc67deddc08d5 1-2,4-6,16-56,83-84,86,97-100,102-104
+tests/test_econ_calendar.py
+  s_5582fd90f01517::t_1715455cf7f9a4 1-36
+tests/test_reconcile.py
+  s_5582fd90f01517::t_b44c95f71ac5f6 1-94
+theta_shepherd/agent.py
+  s_5582fd90f01517::t_f99f19a947a79a 228,230-231
+  s_5582fd90f01517::t_d6bd017baea6f5 179-210
+  s_5582fd90f01517::t_ffe92130aacb4b 10-11,13
+  s_5582fd90f01517::t_884a3f06c0b57a 262,269-271,276
+tests/test_risk.py
+  s_5582fd90f01517::t_a182ac10cbd665 1-55
+theta_shepherd/risk.py
+  s_5582fd90f01517::t_c5b429a58cee55 56,59
+  s_5582fd90f01517::t_a9fb035744f794 40-47
+tests/conftest.py
+  s_5582fd90f01517::t_3635363ec3004e 1-68
+theta_shepherd/retro.py
+  s_5582fd90f01517::t_948ea1f840935b 1-111
+run_agent.py
+  s_5582fd90f01517::t_98294266d4af70 44-45,51-56
+  s_5582fd90f01517::t_9ed2f71890a3b8 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "a2d9584ca6070ad2691befac5eaf1d752a920510",
+  "branch": "main",
+  "prompts": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:0d4edcbaece19ae3ea95b6b52c35e90b0ac86cd877e505357a07cdb3c2c4f5b6",
+      "total_additions": 820,
+      "total_deletions": 44,
+      "accepted_lines": 816,
+      "overriden_lines": 0
+    },
+    "s_b075cd29681ced": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb23a1f-b047-484e-a9eb-d4a5313c198e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:31bf3b045674f97303096c1169580b6002090a7ebc94edf7ad422e513c3a4869",
+      "total_additions": 96,
+      "total_deletions": 0,
+      "accepted_lines": 96,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:0d4edcbaece19ae3ea95b6b52c35e90b0ac86cd877e505357a07cdb3c2c4f5b6",
+      "stats": {
+        "total_additions": 820,
+        "total_deletions": 44,
+        "accepted_lines": 816,
+        "overriden_lines": 0,
+        "files": {
+          "run_agent.py": {
+            "total_additions": 10,
+            "total_deletions": 0,
+            "accepted_lines": 10,
+            "overriden_lines": 0
+          },
+          "tests/conftest.py": {
+            "total_additions": 68,
+            "total_deletions": 0,
+            "accepted_lines": 68,
+            "overriden_lines": 0
+          },
+          "tests/test_committee.py": {
+            "total_additions": 57,
+            "total_deletions": 0,
+            "accepted_lines": 57,
+            "overriden_lines": 0
+          },
+          "tests/test_econ_calendar.py": {
+            "total_additions": 36,
+            "total_deletions": 0,
+            "accepted_lines": 36,
+            "overriden_lines": 0
+          },
+          "tests/test_ladder.py": {
+            "total_additions": 54,
+            "total_deletions": 1,
+            "accepted_lines": 53,
+            "overriden_lines": 0
+          },
+          "tests/test_market.py": {
+            "total_additions": 25,
+            "total_deletions": 0,
+            "accepted_lines": 25,
+            "overriden_lines": 0
+          },
+          "tests/test_reconcile.py": {
+            "total_additions": 94,
+            "total_deletions": 0,
+            "accepted_lines": 94,
+            "overriden_lines": 0
+          },
+          "tests/test_retro.py": {
+            "total_additions": 29,
+            "total_deletions": 0,
+            "accepted_lines": 29,
+            "overriden_lines": 0
+          },
+          "tests/test_risk.py": {
+            "total_additions": 55,
+            "total_deletions": 0,
+            "accepted_lines": 55,
+            "overriden_lines": 0
+          },
+          "tests/test_strategy.py": {
+            "total_additions": 47,
+            "total_deletions": 3,
+            "accepted_lines": 44,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/agent.py": {
+            "total_additions": 43,
+            "total_deletions": 4,
+            "accepted_lines": 43,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/committee.py": {
+            "total_additions": 120,
+            "total_deletions": 0,
+            "accepted_lines": 120,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/config.py": {
+            "total_additions": 4,
+            "total_deletions": 0,
+            "accepted_lines": 4,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/llm.py": {
+            "total_additions": 57,
+            "total_deletions": 32,
+            "accepted_lines": 57,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/retro.py": {
+            "total_additions": 111,
+            "total_deletions": 0,
+            "accepted_lines": 111,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/risk.py": {
+            "total_additions": 10,
+            "total_deletions": 4,
+            "accepted_lines": 10,
+            "overriden_lines": 0
+          }
+        }
+      }
+    },
+    "s_b075cd29681ced": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3fb23a1f-b047-484e-a9eb-d4a5313c198e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:31bf3b045674f97303096c1169580b6002090a7ebc94edf7ad422e513c3a4869",
+      "stats": {
+        "total_additions": 96,
+        "total_deletions": 0,
+        "accepted_lines": 96,
+        "overriden_lines": 0,
+        "files": {
+          "CONTINUE.md": {
+            "total_additions": 96,
+            "total_deletions": 0,
+            "accepted_lines": 96,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
