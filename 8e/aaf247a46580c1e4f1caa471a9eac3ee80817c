@@ -1,0 +1,73 @@
+presentation/cover.html
+  s_5582fd90f01517::t_4ac6c333defb87 1-68
+CONTINUE.md
+  s_5582fd90f01517::t_355c94f8ae0637 63-71,75-76
+presentation/video_script.md
+  s_5582fd90f01517::t_ece34ae4d34e85 1-78
+presentation/slides.md
+  s_5582fd90f01517::t_a1aae41ecd0a1d 1-78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "8eaaf247a46580c1e4f1caa471a9eac3ee80817c",
+  "branch": "main",
+  "prompts": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:d7db0a239f7ae45abb9a6a03999b8e335187fcb5fabb5d1348743d5a5ad5381e",
+      "total_additions": 235,
+      "total_deletions": 2,
+      "accepted_lines": 235,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:d7db0a239f7ae45abb9a6a03999b8e335187fcb5fabb5d1348743d5a5ad5381e",
+      "stats": {
+        "total_additions": 235,
+        "total_deletions": 2,
+        "accepted_lines": 235,
+        "overriden_lines": 0,
+        "files": {
+          "CONTINUE.md": {
+            "total_additions": 11,
+            "total_deletions": 2,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          },
+          "presentation/cover.html": {
+            "total_additions": 68,
+            "total_deletions": 0,
+            "accepted_lines": 68,
+            "overriden_lines": 0
+          },
+          "presentation/slides.md": {
+            "total_additions": 78,
+            "total_deletions": 0,
+            "accepted_lines": 78,
+            "overriden_lines": 0
+          },
+          "presentation/video_script.md": {
+            "total_additions": 78,
+            "total_deletions": 0,
+            "accepted_lines": 78,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
