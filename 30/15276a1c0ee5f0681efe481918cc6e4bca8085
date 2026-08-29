@@ -1,0 +1,74 @@
+run_agent.py
+  s_5582fd90f01517::t_e19d661cf1a381 48-49
+  s_5582fd90f01517::t_eb482d3a355da0 63-66
+CONTINUE.md
+  s_5582fd90f01517::t_4b9408748ad498 98-107
+docs/dashboard.html
+  s_5582fd90f01517::t_0439a925549f16 171
+theta_shepherd/agent.py
+  s_5582fd90f01517::t_4d38c2dd6b962c 461-575
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "3015276a1c0ee5f0681efe481918cc6e4bca8085",
+  "branch": "main",
+  "prompts": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:cb4c968df978f4552c4e7c2fe888ca2e392852e2f953f84be48477a909f12a84",
+      "total_additions": 132,
+      "total_deletions": 1,
+      "accepted_lines": 541,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:cb4c968df978f4552c4e7c2fe888ca2e392852e2f953f84be48477a909f12a84",
+      "stats": {
+        "total_additions": 132,
+        "total_deletions": 1,
+        "accepted_lines": 541,
+        "overriden_lines": 0,
+        "files": {
+          "CONTINUE.md": {
+            "total_additions": 10,
+            "total_deletions": 0,
+            "accepted_lines": 10,
+            "overriden_lines": 0
+          },
+          "docs/dashboard.html": {
+            "total_additions": 1,
+            "total_deletions": 1,
+            "accepted_lines": 410,
+            "overriden_lines": 0
+          },
+          "run_agent.py": {
+            "total_additions": 6,
+            "total_deletions": 0,
+            "accepted_lines": 6,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/agent.py": {
+            "total_additions": 115,
+            "total_deletions": 0,
+            "accepted_lines": 115,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
