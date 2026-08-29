@@ -1,0 +1,114 @@
+tests/conftest.py
+  s_5582fd90f01517::t_1cb0fa6a737014 18
+theta_shepherd/journal.py
+  s_5582fd90f01517::t_962a666da12a85 30-38,43-44,46-50
+  s_5582fd90f01517::t_8a2299bfe96d66 8,15
+scheduler_health.bat
+  s_5582fd90f01517::t_24f7c8593bea81 1-7
+theta_shepherd/agent.py
+  s_5582fd90f01517::t_00db377654b6c1 182-187
+  s_5582fd90f01517::t_05c439ac354d7f 331-338
+  s_5582fd90f01517::t_e7585082a15299 10-11,13
+  s_5582fd90f01517::t_9c1aee1c3036ec 38-60
+  s_5582fd90f01517::t_a739d677f88a8f 152
+  s_5582fd90f01517::t_671acbacfd8198 225-226
+  s_5582fd90f01517::t_1b89af2a3b6802 244-246
+  s_5582fd90f01517::t_fc9a218043086b 377-380
+run_agent.py
+  s_5582fd90f01517::t_7443bc69f2607a 8-9
+  s_5582fd90f01517::t_8927a8b8f2955b 48-50,53-60
+tests/test_hardening.py
+  s_5582fd90f01517::t_59dae69f91b157 1-79
+scheduler_retro.bat
+  s_5582fd90f01517::t_ea372cad0adc11 2-3,7-9
+theta_shepherd/preflight.py
+  s_5582fd90f01517::t_a3f2ade1432c7f 1-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "9f7a822be8ecc472d24552d927a4e6425a2d5d3a",
+  "branch": "main",
+  "prompts": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:72775917fdf48a369a02ced88d74d3c85e186ea5d5a8e9802d81e4ac6b3b9e52",
+      "total_additions": 320,
+      "total_deletions": 7,
+      "accepted_lines": 320,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:72775917fdf48a369a02ced88d74d3c85e186ea5d5a8e9802d81e4ac6b3b9e52",
+      "stats": {
+        "total_additions": 320,
+        "total_deletions": 7,
+        "accepted_lines": 320,
+        "overriden_lines": 0,
+        "files": {
+          "run_agent.py": {
+            "total_additions": 14,
+            "total_deletions": 0,
+            "accepted_lines": 14,
+            "overriden_lines": 0
+          },
+          "scheduler_health.bat": {
+            "total_additions": 7,
+            "total_deletions": 0,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "scheduler_retro.bat": {
+            "total_additions": 5,
+            "total_deletions": 2,
+            "accepted_lines": 5,
+            "overriden_lines": 0
+          },
+          "tests/conftest.py": {
+            "total_additions": 1,
+            "total_deletions": 0,
+            "accepted_lines": 1,
+            "overriden_lines": 0
+          },
+          "tests/test_hardening.py": {
+            "total_additions": 79,
+            "total_deletions": 0,
+            "accepted_lines": 79,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/agent.py": {
+            "total_additions": 50,
+            "total_deletions": 2,
+            "accepted_lines": 50,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/journal.py": {
+            "total_additions": 18,
+            "total_deletions": 3,
+            "accepted_lines": 18,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/preflight.py": {
+            "total_additions": 146,
+            "total_deletions": 0,
+            "accepted_lines": 146,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
