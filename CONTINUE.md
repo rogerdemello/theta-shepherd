@@ -69,6 +69,16 @@ During market days, run cycles every ~20–30 min (`--loop` or Task Scheduler �
 - **Cover image**: `docs/cover.png` (1280×720, regenerate from `presentation/cover.html` via headless Edge).
 - **Claude artifacts are OUT** (user asked to delete them — deletion only possible by user at claude.ai/code/artifacts; do NOT publish new ones). Demo URL for the submission is GitHub Pages only: **https://rogerdemello.github.io/theta-shepherd/** (regenerate with `python dashboard.py`, commit docs/, push — Pages redeploys automatically).
 
+## Done Sat Aug 29 block 3 ✅ (approved plan `linear-churning-plum`)
+
+- **IWM added** (3rd underlying) with per-underlying width: `settings.width_for()` — $5 default, $3 IWM. Verify IWM candidates appear in Monday's `--scout`.
+- **Featherless multi-model committee**: Vol Trader runs on `FEATHERLESS_MODEL` (default Qwen2.5-72B) via OpenAI-compatible API **when `FEATHERLESS_API_KEY` lands in `.env`** (per-seat Azure fallback; opinion journaled with `_model`). `chat_json` now client-agnostic with tolerant JSON extraction. **Live-smoke the committee once the user provides the key.** 69 tests green.
+- **Dashboard**: trade markers on equity curve (hollow=open, filled=close, tooltips), win-rate + debates tiles, model name shown per persona card.
+- **README hero**: cover + dashboard screenshot (`docs/dashboard_screenshot.png`) + live-dashboard link at top.
+- **`docs/mcp_demo.md`**: REAL MCP transcript (alpaca-mcp-server v3.4.7 over stdio: 72 tools, account, positions leg-by-leg net +$16 unrealized, clock).
+- **WRITEUP.md** fully refreshed (committee/satellite/ladder/learning + all 4 Alpaca pillars; 【】 for Thu numbers). **`social/submission_form.md`**: copy-paste form fields.
+- ⚠️ Gotcha learned: alpaca-mcp-server exposes destructive tools (`close_all_positions` etc.) — a name-heuristic demo script accidentally called it (all 4 legs rejected 422, market closed, zero harm; verified 0 open orders, positions intact). **Never pick MCP tools by heuristic; use exact read-only names.**
+
 ## Still TODO
 
 - Optional: Featherless AI persona (partner tech; needs user to claim $25 credits)
