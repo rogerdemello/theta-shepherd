@@ -47,6 +47,10 @@ class Settings:
     # Risk gates (dollars, per $100k account)
     max_risk_per_trade: float = _env_float("MAX_RISK_PER_TRADE", 2_000.0)
     max_portfolio_risk: float = _env_float("MAX_PORTFOLIO_RISK", 10_000.0)
+    # Risk ladder: portfolio cap starts at the base and earns +step per green
+    # day, up to max_portfolio_risk. Risk is a privilege the book pays for.
+    ladder_base_risk: float = _env_float("LADDER_BASE_RISK", 4_000.0)
+    ladder_step: float = _env_float("LADDER_STEP", 2_000.0)
     daily_loss_limit: float = _env_float("DAILY_LOSS_LIMIT", 3_000.0)
     max_open_spreads: int = 6
     max_new_trades_per_run: int = 2

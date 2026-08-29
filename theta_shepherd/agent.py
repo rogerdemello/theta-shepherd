@@ -7,7 +7,10 @@ from datetime import date
 from alpaca.trading.enums import OrderStatus
 from rich.console import Console
 
+import traceback
+
 from . import cli_ops, econ_calendar
+from .committee import Committee
 from .config import settings
 from .execution import (
     close_spread,
@@ -173,6 +176,38 @@ def check_kill_switch(risk, state: dict) -> bool:
     return False
 
 
+def update_risk_ladder(state: dict, equity: float) -> float:
+    """Portfolio risk cap that starts small and earns headroom on green days.
+
+    Uses the ET calendar date so the cap never steps mid-session (IST cycles
+    cross local midnight). Returns the cap to use for this cycle."""
+    today = econ_calendar.now_et().date().isoformat()
+    ladder = state.get("ladder")
+    if ladder is None:
+        ladder = {"cap": settings.ladder_base_risk, "date": today, "ref_equity": equity}
+        state["ladder"] = ladder
+        log_event("risk_ladder", {"action": "init", **ladder})
+    elif ladder["date"] != today:
+        green = equity > ladder["ref_equity"]
+        if green:
+            ladder["cap"] = min(ladder["cap"] + settings.ladder_step,
+                                settings.max_portfolio_risk)
+        ladder.update(date=today, ref_equity=equity)
+        log_event("risk_ladder", {"action": "step_up" if green else "hold", **ladder})
+    return min(ladder["cap"], settings.max_portfolio_risk)
+
+
+def gate_decision(account_summary: dict, open_spreads: list[dict],
+                  candidates: list[dict], headlines: list[str]) -> dict:
+    """Committee first; single gatekeeper as fallback if the debate errors."""
+    try:
+        return Committee().decide(account_summary, open_spreads, candidates, headlines)
+    except Exception:
+        log_event("committee_error", {"traceback": traceback.format_exc()})
+        console.print("[red]Committee failed — falling back to single gatekeeper.[/]")
+        return Gatekeeper().decide(account_summary, open_spreads, candidates, headlines)
+
+
 def run_cycle(force: bool = False) -> None:
     trading = make_trading_client()
     md = MarketData()
@@ -190,8 +225,10 @@ def run_cycle(force: bool = False) -> None:
     save_state(state)
 
     risk = account_risk(trading, state)
+    portfolio_cap = update_risk_ladder(state, risk.equity)
     account_summary = {"equity": risk.equity, "day_pnl": round(risk.day_pnl, 2),
-                       "open_spreads": risk.open_spreads, "committed_risk": risk.committed_risk}
+                       "open_spreads": risk.open_spreads, "committed_risk": risk.committed_risk,
+                       "portfolio_risk_cap": portfolio_cap}
     log_event("cycle_start", account_summary)
     cli_ops.snapshot_account()
     cli_ops.snapshot_positions()
@@ -222,19 +259,21 @@ def run_cycle(force: bool = False) -> None:
 
     headlines = md.recent_headlines(settings.underlyings + ["SPX"])
     account_summary["upcoming_macro_events"] = econ_calendar.upcoming()
-    decision = Gatekeeper().decide(
+    decision = gate_decision(
         account_summary,
         [{k: s.get(k) for k in ("kind", "underlying", "short_symbol", "qty", "status")}
          for s in state["open_spreads"]],
         [c.describe() for c in candidates],
         headlines,
     )
-    console.print(f"[cyan]LLM view:[/] {decision.get('market_view', 'n/a')}")
+    console.print(f"[cyan]Committee view:[/] {decision.get('market_view', 'n/a')}")
+    if decision.get("debate_summary"):
+        console.print(f"[magenta]Debate:[/] {decision['debate_summary']}")
 
     for approval in decision["approved"]:
         cand = candidates[approval["index"]]
         qty = max(1, int(size_trade(cand) * approval["size_factor"])) if size_trade(cand) else 0
-        violations = entry_gates(risk, cand, qty)
+        violations = entry_gates(risk, cand, qty, portfolio_cap)
         if violations:
             console.print(f"[red]Risk gate veto:[/] {violations}")
             log_event("risk_veto", {"candidate": cand.describe(), "violations": violations})

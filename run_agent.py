@@ -4,6 +4,7 @@
   python run_agent.py --loop     # run continuously, one cycle every 30 min
   python run_agent.py --force    # run a cycle even when the market is closed
   python run_agent.py --scout    # dry run: show candidates, place no orders
+  python run_agent.py --retro    # nightly retrospective: journal -> lessons.md
 """
 
 import argparse
@@ -40,10 +41,19 @@ def main() -> None:
     parser.add_argument("--force", action="store_true", help="run even if market closed")
     parser.add_argument("--scout", action="store_true", help="show candidates only, no orders")
     parser.add_argument("--flatten", action="store_true", help="cancel entries and close all open spreads")
+    parser.add_argument("--retro", nargs="?", const="today", metavar="YYYY-MM-DD",
+                        help="run the nightly retrospective (optionally for a past date)")
     args = parser.parse_args()
 
     if args.scout:
         scout()
+        return
+    if args.retro:
+        from datetime import date
+        from theta_shepherd.retro import run_retro
+        day = None if args.retro == "today" else date.fromisoformat(args.retro)
+        section = run_retro(day)
+        console.print(section or "[yellow]No journal events for that day — nothing to learn.[/]")
         return
     if args.flatten:
         from theta_shepherd.agent import run_flatten

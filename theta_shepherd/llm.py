@@ -1,8 +1,9 @@
-"""Azure OpenAI gatekeeper: reviews quantitatively pre-screened spread
-candidates against market context and news, and decides which to trade.
+"""Azure OpenAI plumbing shared by the single gatekeeper (fallback) and the
+Trading Committee, plus the gatekeeper itself.
 
-The LLM can only select from candidates the strategy engine produced and can
-only reduce size — hard risk gates in risk.py always run after it.
+Every LLM in this system can only select from candidates the strategy engine
+produced and can only reduce size — hard risk gates in risk.py always run
+after it.
 """
 
 import json
@@ -11,6 +12,47 @@ from openai import AzureOpenAI
 
 from .config import settings
 from .journal import log_event
+
+
+def azure_client() -> AzureOpenAI:
+    return AzureOpenAI(
+        azure_endpoint=settings.azure_endpoint,
+        api_key=settings.azure_api_key,
+        api_version=settings.azure_api_version,
+    )
+
+
+def chat_json(client: AzureOpenAI, system: str, user_payload: str,
+              temperature: float = 0.2) -> dict:
+    """One JSON-mode chat completion; returns {} -shaped dict even on bad output."""
+    response = client.chat.completions.create(
+        model=settings.azure_deployment,
+        response_format={"type": "json_object"},
+        temperature=temperature,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_payload},
+        ],
+    )
+    raw = response.choices[0].message.content or "{}"
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {"_error": f"unparseable LLM output: {raw[:200]}"}
+
+
+def sanitize_approvals(decision: dict, n_candidates: int) -> dict:
+    """Clamp an LLM decision to the allowed action space: valid candidate
+    indices, size_factor in [0.25, 1.0], at most max_new_trades_per_run."""
+    approved = []
+    for a in decision.get("approved", []):
+        idx = a.get("index")
+        if isinstance(idx, int) and 0 <= idx < n_candidates:
+            a["size_factor"] = min(1.0, max(0.25, float(a.get("size_factor", 1.0))))
+            approved.append(a)
+    decision["approved"] = approved[: settings.max_new_trades_per_run]
+    return decision
+
 
 SYSTEM_PROMPT = """You are the risk-aware gatekeeper of an autonomous options
 premium-selling agent trading an Alpaca PAPER account in a one-week competition.
@@ -38,12 +80,10 @@ Respond ONLY with JSON:
 
 
 class Gatekeeper:
+    """Single-LLM fallback used when the committee is unavailable."""
+
     def __init__(self) -> None:
-        self.client = AzureOpenAI(
-            azure_endpoint=settings.azure_endpoint,
-            api_key=settings.azure_api_key,
-            api_version=settings.azure_api_version,
-        )
+        self.client = azure_client()
 
     def decide(self, account: dict, open_spreads: list[dict], candidates: list[dict],
                headlines: list[str]) -> dict:
@@ -54,28 +94,13 @@ class Gatekeeper:
             "recent_headlines": headlines,
         }, indent=2)
 
-        response = self.client.chat.completions.create(
-            model=settings.azure_deployment,
-            response_format={"type": "json_object"},
-            temperature=0.2,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT.format(max_new=settings.max_new_trades_per_run)},
-                {"role": "user", "content": user_payload},
-            ],
+        decision = chat_json(
+            self.client,
+            SYSTEM_PROMPT.format(max_new=settings.max_new_trades_per_run),
+            user_payload,
         )
-        raw = response.choices[0].message.content or "{}"
-        try:
-            decision = json.loads(raw)
-        except json.JSONDecodeError:
-            decision = {"approved": [], "market_view": f"unparseable LLM output: {raw[:200]}"}
-
-        approved = []
-        for a in decision.get("approved", []):
-            idx = a.get("index")
-            if isinstance(idx, int) and 0 <= idx < len(candidates):
-                a["size_factor"] = min(1.0, max(0.25, float(a.get("size_factor", 1.0))))
-                approved.append(a)
-        decision["approved"] = approved[: settings.max_new_trades_per_run]
-
+        if "_error" in decision:
+            decision = {"approved": [], "market_view": decision["_error"]}
+        decision = sanitize_approvals(decision, len(candidates))
         log_event("llm_decision", {"decision": decision})
         return decision

@@ -37,8 +37,14 @@ def size_trade(candidate: SpreadCandidate) -> int:
     return max(0, int(settings.max_risk_per_trade // candidate.max_loss))
 
 
-def entry_gates(risk: AccountRisk, candidate: SpreadCandidate, qty: int) -> list[str]:
-    """Returns a list of violated gates; empty list means the trade may proceed."""
+def entry_gates(risk: AccountRisk, candidate: SpreadCandidate, qty: int,
+                portfolio_cap: float | None = None) -> list[str]:
+    """Returns a list of violated gates; empty list means the trade may proceed.
+
+    `portfolio_cap` is the current risk-ladder cap; defaults to the hard
+    ceiling when no ladder is in play (e.g. in tests)."""
+    cap = min(portfolio_cap, settings.max_portfolio_risk) \
+        if portfolio_cap is not None else settings.max_portfolio_risk
     violations = []
     if qty < 1:
         violations.append("size_zero: max_loss per lot exceeds per-trade risk cap")
@@ -47,10 +53,10 @@ def entry_gates(risk: AccountRisk, candidate: SpreadCandidate, qty: int) -> list
     if risk.open_spreads >= settings.max_open_spreads:
         violations.append(f"max_open_spreads: {risk.open_spreads} already open")
     new_risk = candidate.max_loss * qty
-    if risk.committed_risk + new_risk > settings.max_portfolio_risk:
+    if risk.committed_risk + new_risk > cap:
         violations.append(
             f"portfolio_risk_cap: committed {risk.committed_risk:.0f} + new {new_risk:.0f}"
-            f" > {settings.max_portfolio_risk:.0f}"
+            f" > {cap:.0f}"
         )
     if candidate.credit < settings.min_credit_frac * candidate.width:
         violations.append("min_credit: credit below floor at submission time")
