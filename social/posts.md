@@ -40,8 +40,46 @@ Tag targets — X: @lablabai @AlpacaHQ · LinkedIn: lablab.ai, Alpaca
 
 ---
 
-## Post 2 — Weekend: The Trading Committee (draft after B lands)
-(placeholder: 3-persona debate screenshot + "my agent argues with itself so I don't have to")
+## Post 2 — Weekend: The Trading Committee (ready — post Sat/Sun with debate screenshot)
+
+Attach: screenshot of the "Committee debates" card on the dashboard (docs/dashboard.html)
+showing the three personas + chair verdict from Aug 29.
+
+**X:**
+
+> My trading agent now argues with itself so I don't have to 🐑
+>
+> Theta Shepherd upgrade for the @AlpacaHQ × @lablabai hackathon: the single AI gatekeeper is now a 3-persona Trading Committee — a Macro Analyst, a Vol Trader and a Risk Officer vote independently, then a Chair rules.
+>
+> First real debate: the Vol Trader liked a SPY put spread ("POP 0.82, strikes outside the expected move"). The Macro Analyst and Risk Officer both vetoed — jobs week + concentration risk.
+>
+> Chair's verdict: no trades. Sometimes the best trade is the argument that stops one.
+>
+> Every debate is journaled and replayable. And each night the shepherd re-reads its own journal and writes lessons that change how the committee argues tomorrow.
+>
+> #AITrading #BuildInPublic #OptionsTrading
+
+**LinkedIn:**
+
+> Weekend upgrade to Theta Shepherd 🐑 (my entry in the Alpaca AI Trading Agents Hackathon with lablab.ai): I fired the AI gatekeeper and hired a committee.
+>
+> Instead of one LLM saying yes/no to trades, three personas now review every candidate independently — in separate model calls, so they can't anchor on each other:
+> • The Macro Analyst worries about the economic calendar and event-gap risk
+> • The Vol Trader asks whether the premium is actually worth selling
+> • The Risk Officer watches concentration, correlation and path risk — and their veto weighs heaviest
+> A Chair reads all three opinions and issues the final decision. Hard-coded risk gates still sit above everyone; no LLM can override them.
+>
+> Their first real debate this weekend was exactly what I hoped for. The Vol Trader approved a SPY put credit spread on the numbers (probability of profit 0.82, strikes outside the expected move). The Macro Analyst rejected it — it expires right after the ISM release, into a week that ends with nonfarm payrolls. The Risk Officer rejected it too: the book already holds a QQQ iron condor on the same expiry. The Chair ruled: no new trades.
+>
+> Two more things shipped this weekend:
+> • A nightly retrospective — the agent re-reads its full decision journal after each close and writes concrete lessons ("start put spreads closer to mid-price; the call side filled instantly at 0.22 delta") that are injected into the next day's committee prompts. The shepherd provably learns across the week.
+> • A risk ladder — the portfolio risk cap starts at $4k and earns +$2k of headroom per green day, up to $10k. Risk is a privilege the book pays for.
+>
+> 48 unit tests, every debate journaled, dashboard rendering it all. Markets reopen Monday; the committee will be arguing every 20 minutes.
+>
+> Repo: github.com/rogerdemello/theta-shepherd
+>
+> @Alpaca @lablab.ai #AITrading #AIAgents #AlgorithmicTrading
 
 ## Post 3 — Day 2/3: Equity curve + what filled
 (placeholder: dashboard screenshot, realized P&L, one lesson from lessons.md)
