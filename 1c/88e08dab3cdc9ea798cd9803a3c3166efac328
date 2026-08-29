@@ -1,0 +1,57 @@
+CONTINUE.md
+  s_5582fd90f01517::t_9a74fb410c6b2f 91-97
+README.md
+  s_5582fd90f01517::t_27bf7fb5420843 136-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "1c88e08dab3cdc9ea798cd9803a3c3166efac328",
+  "branch": "main",
+  "prompts": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:e5c2e75f72f872c2bbae9531bac7c62cde9e44ecfece8092448533cca88bf408",
+      "total_additions": 18,
+      "total_deletions": 1,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_5582fd90f01517": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8bbeeece-12d1-4d21-834d-c42ef7c13d8f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:e5c2e75f72f872c2bbae9531bac7c62cde9e44ecfece8092448533cca88bf408",
+      "stats": {
+        "total_additions": 18,
+        "total_deletions": 1,
+        "accepted_lines": 18,
+        "overriden_lines": 0,
+        "files": {
+          "CONTINUE.md": {
+            "total_additions": 7,
+            "total_deletions": 0,
+            "accepted_lines": 7,
+            "overriden_lines": 0
+          },
+          "README.md": {
+            "total_additions": 11,
+            "total_deletions": 1,
+            "accepted_lines": 11,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
