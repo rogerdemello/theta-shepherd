@@ -45,6 +45,8 @@ def main() -> None:
     parser.add_argument("--flatten", action="store_true", help="cancel entries and close all open spreads")
     parser.add_argument("--retro", nargs="?", const="today", metavar="YYYY-MM-DD",
                         help="run the nightly retrospective (optionally for a past date)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="full pipeline rehearsal: no orders, no state writes")
     parser.add_argument("--preflight", action="store_true", help="go/no-go operational checks")
     parser.add_argument("--health", action="store_true",
                         help="watchdog: run a cycle now if the schedule went stale")
@@ -57,6 +59,10 @@ def main() -> None:
     if args.health:
         from theta_shepherd.preflight import run_health
         run_health()
+        return
+    if args.dry_run:
+        from theta_shepherd.agent import run_dry_run
+        run_dry_run()
         return
 
     if args.scout:

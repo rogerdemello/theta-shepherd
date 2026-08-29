@@ -95,6 +95,16 @@ Research-backed P&L push (50%-manage-and-redeploy beats hold; expiry-day AM thet
 - Nightly retro task now also regenerates the dashboard and pushes docs/ → Pages auto-updates.
 - **84 tests green.** Monday morning routine: just run `--preflight` before 19:00 IST.
 
+## Done Sat Aug 29 block 6 ✅ — full dry run PASSED
+
+New `--dry-run` mode (full pipeline rehearsal, zero side effects — verified by state.json md5 unchanged). Live results:
+- Broker truth: put spread journal=pending_fill / broker=FILLED @0.76 — Monday's first reconcile will adopt it (expected).
+- Positions in sync (4 legs, no orphans). Exit engine: both sides "hold" (marks 0.895/0.725 vs targets ~0.51/0.38, stops 2.02/1.52) — correct.
+- Ladder rebased 4k→10k; sessions_left=4; no blackout/flatten/STOP.
+- Scout: 8 candidates, all expiries ≤ Sep 3 (contest horizon ✓), IWM $3-width present ✓, deltas in 0.15–0.30 ✓.
+- Committee live debate: rejected QQQ adds (concentration — Risk Officer), approved SPY 775/780 x9 ($3.7k) + IWM 299/302 x7 ($1.8k) for diversification. Sizing within per-trade $4k and $10k ladder ✓.
+- pytest 84 ✓, preflight 8/8 GO ✓, health OK ✓, dashboard regenerated ✓.
+
 ## Still TODO
 
 - ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.

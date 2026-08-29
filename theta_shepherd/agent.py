@@ -458,6 +458,121 @@ def maybe_open_satellite(trading, md: MarketData, risk, state: dict,
                   f"debit~{record['limit_debit']}")
 
 
+def run_dry_run() -> None:
+    """Rehearse the FULL decision pipeline with zero side effects: no orders,
+    no cancels, no state writes. Everything else is real — broker reads,
+    market data, guards, the scout, the committee debate, the risk gates."""
+    trading = make_trading_client()
+    md = MarketData()
+    clock = trading.get_clock()
+    console.print(f"[bold]DRY RUN[/] | market {'OPEN' if clock.is_open else 'CLOSED'}")
+    log_event("dry_run_start", {"market_open": clock.is_open})
+
+    state = load_state()
+
+    console.print("[bold]1. Broker order truth[/] (read-only)")
+    for s in state["open_spreads"]:
+        order_id = s.get("close_order_id") or s["order_id"]
+        try:
+            order = trading.get_order_by_id(order_id)
+            console.print(f"   {s['client_order_id']}: journal={s['status']} "
+                          f"broker={order.status} filled_avg={order.filled_avg_price}")
+        except Exception as e:
+            console.print(f"   {s['client_order_id']}: [red]lookup failed[/] ({e})")
+
+    console.print("[bold]2. Positions vs state[/]")
+    positions = {p.symbol: float(p.qty) for p in trading.get_all_positions()
+                 if len(p.symbol) > 12}
+    tracked = {sym for s in state["open_spreads"]
+               for sym in (s["short_symbol"], s["long_symbol"])}
+    orphans = set(positions) - tracked
+    console.print(f"   broker legs={len(positions)} tracked={len(tracked)} "
+                  f"orphans={orphans or 'none'}")
+
+    console.print("[bold]3. Exit engine[/] (what would it do right now?)")
+    for s in state["open_spreads"]:
+        if s["status"] not in ("open", "pending_fill"):
+            continue
+        _, exp, _, _ = parse_occ(s["short_symbol"])
+        dte = (exp - date.today()).days
+        if _is_satellite(s):
+            mark = satellite_value(md, s)
+            reason = satellite_exit_reason(mark, s.get("filled_debit", s["limit_debit"]), dte)
+        else:
+            credit = s.get("filled_credit", s["limit_credit"])
+            mark = spread_close_cost(md, s)
+            reason = None
+            if mark is not None and mark <= credit * (1 - settings.profit_target_frac):
+                reason = "profit_target"
+            elif mark is not None and mark >= credit * settings.stop_loss_mult:
+                reason = "stop_loss"
+            elif should_force_close(dte):
+                reason = "expiry_close"
+        console.print(f"   {s['short_symbol']}: mark={mark} dte={dte} → "
+                      f"{'[yellow]' + reason + '[/]' if reason else 'hold'}")
+
+    console.print("[bold]4. Risk & guards[/]")
+    risk = account_risk(trading, state)
+    cap = update_risk_ladder(state, risk.equity)  # state not saved → ephemeral
+    console.print(f"   equity={risk.equity:,.2f} day_pnl={risk.day_pnl:+.2f} "
+                  f"committed={risk.committed_risk:,.0f} ladder_cap={cap:,.0f}")
+    console.print(f"   must_flatten={econ_calendar.must_flatten()} "
+                  f"blackout={econ_calendar.entry_blackout()} "
+                  f"stop_file={STOP_FILE.exists()} "
+                  f"sessions_left={econ_calendar.sessions_remaining()}")
+
+    console.print("[bold]5. Scout[/]")
+    candidates = find_candidates(md)
+    for c in candidates:
+        d = c.describe()
+        console.print(f"   {d['kind']} {d['underlying']} "
+                      f"{d['short_strike']}/{d['long_strike']} exp={d['expiration']} "
+                      f"Δ={d['short_delta']} credit={d['credit_per_share']} "
+                      f"score={c.score:.3f}")
+    if not candidates:
+        console.print("   none (stale weekend quotes or contest horizon)")
+        log_event("dry_run_end", {"would_submit": 0})
+        console.print("[bold green]DRY RUN COMPLETE — nothing submitted, nothing written[/]")
+        return
+
+    console.print("[bold]6. Committee[/] (real debate, journaled)")
+    account_summary = {"equity": risk.equity, "day_pnl": round(risk.day_pnl, 2),
+                       "open_spreads": risk.open_spreads,
+                       "committed_risk": risk.committed_risk,
+                       "portfolio_risk_cap": cap,
+                       "upcoming_macro_events": econ_calendar.upcoming(),
+                       "sessions_remaining_before_mandatory_flatten":
+                           econ_calendar.sessions_remaining()}
+    headlines = md.recent_headlines(settings.underlyings + ["SPX"])
+    decision = gate_decision(
+        account_summary,
+        [{k: s.get(k) for k in ("kind", "underlying", "short_symbol", "qty", "status")}
+         for s in state["open_spreads"]],
+        [c.describe() for c in candidates], headlines)
+    console.print(f"   view: {decision.get('market_view', 'n/a')}")
+    if decision.get("debate_summary"):
+        console.print(f"   debate: {decision['debate_summary']}")
+
+    console.print("[bold]7. Would submit[/] (orders suppressed)")
+    would = 0
+    for approval in decision["approved"]:
+        cand = candidates[approval["index"]]
+        qty = max(1, int(size_trade(cand) * approval["size_factor"])) if size_trade(cand) else 0
+        violations = entry_gates(risk, cand, qty, cap)
+        if violations:
+            console.print(f"   [red]veto[/] {cand.underlying} {cand.kind}: {violations}")
+        else:
+            would += 1
+            console.print(f"   [green]WOULD OPEN[/] {cand.kind} {cand.underlying} "
+                          f"{cand.short.strike}/{cand.long.strike} x{qty} "
+                          f"credit~{cand.credit:.2f} risk={cand.max_loss * qty:,.0f}")
+    sat = decision.get("satellite")
+    if sat:
+        console.print(f"   satellite proposed: {sat.get('direction')} {sat.get('underlying')}")
+    log_event("dry_run_end", {"would_submit": would})
+    console.print("[bold green]DRY RUN COMPLETE — nothing submitted, nothing written[/]")
+
+
 def run_flatten() -> None:
     """Manual flatten entry point (run_agent.py --flatten)."""
     trading = make_trading_client()
