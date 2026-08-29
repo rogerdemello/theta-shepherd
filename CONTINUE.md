@@ -60,11 +60,20 @@ During market days, run cycles every ~20–30 min (`--loop` or Task Scheduler �
 - Journal gotcha handled: first-session events used `kind` as event key; `dashboard.py::_normalize` adapts them. `entry_filled` now logs qty+short_symbol.
 - Account is green: equity ~$100,016 (+$16 day) as of Sat.
 
+## Done Sat Aug 29 block 2 ✅ ("I want to win" push)
+
+- **A6 satellite sleeve SHIPPED**: personas emit `directional_view`; chair may propose `satellite` only on 3-way non-neutral unanimity (engine re-verifies in `committee.py::unanimous_direction`); `find_satellite_candidate` (long ~0.55Δ, $5 wide, debit ≤60% width, 2–7 DTE); `open_satellite`/`close_satellite` (positive MLEG limit = debit); exits +50%/−50%/DTE≤1; one at a time, ≤$2k (`satellite_gates`); unfilled entries abandoned not chased. **62 tests green.**
+- CLI options snapshot spot-checks each cycle (`cli_ops.snapshot_options`, short legs, journaled `cli_options_snapshot`) — verified live.
+- README: mermaid architecture diagram + satellite paragraph.
+- `presentation/video_script.md` (3-min, timed, 【】 placeholders) + `presentation/slides.md` (7 slides).
+- **Cover image**: `docs/cover.png` (1280×720, regenerate from `presentation/cover.html` via headless Edge).
+- Dashboard artifact republished (user re-approved artifacts): **https://claude.ai/code/artifact/d76b05de-8fd8-4a5a-9525-52c3e5fe81f8** (older e5ececa1… URL is dead-ended; use d76b05de or pass it as `url` when updating from a new session). GitHub Pages also live: https://rogerdemello.github.io/theta-shepherd/
+
 ## Still TODO
 
-- A6 satellite sleeve (optional — committee `unanimous` flag ready; needs debit-spread strategy+execution path; only if time permits, it's a P&L risk)
 - Optional: Featherless AI persona (partner tech; needs user to claim $25 credits)
-- Mon–Wed: daily verify fills / screenshot dashboard / regenerate+push dashboard / post; Wed flatten check; Thu video+slides+writeup+regenerate keys+submit
+- Mon–Wed: daily verify fills / regenerate+push dashboard + republish artifact / post; Wed flatten check; Thu video+slides+writeup+regenerate keys+submit
+- User actions pending: post #1 and #2 on X/LinkedIn
 
 ## Done ✅ (Fri Aug 28)
 

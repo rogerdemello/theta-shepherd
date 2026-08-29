@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>cover</title>
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: #0d0d0d; color: #ffffff;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    position: relative;
+  }
+  /* soft equity-curve backdrop */
+  svg.curve { position: absolute; inset: 0; }
+  .wrap { position: relative; z-index: 2; padding: 72px 84px; height: 100%;
+          display: flex; flex-direction: column; }
+  .kicker { font-size: 22px; letter-spacing: .16em; text-transform: uppercase;
+            color: #898781; }
+  h1 { font-size: 96px; font-weight: 750; margin-top: 14px; line-height: 1.02; }
+  h1 .sheep { font-size: 84px; margin-right: 10px; }
+  .tag { font-size: 30px; color: #c3c2b7; margin-top: 22px; max-width: 900px;
+         line-height: 1.35; }
+  .tag b { color: #ffffff; font-weight: 650; }
+  .chips { display: flex; gap: 14px; margin-top: auto; flex-wrap: wrap; }
+  .chip { border: 2px solid rgba(255,255,255,.18); border-radius: 999px;
+          padding: 10px 22px; font-size: 21px; color: #c3c2b7;
+          background: #0d0d0d; }
+  .chip.blue { border-color: #3987e5; color: #ffffff; background: rgba(57,135,229,.16); }
+  .foot { display: flex; justify-content: space-between; align-items: baseline;
+          margin-top: 26px; font-size: 21px; color: #898781; }
+  .foot .repo { color: #c3c2b7; }
+</style>
+</head>
+<body>
+  <svg class="curve" width="1280" height="720" viewBox="0 0 1280 720">
+    <defs>
+      <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3987e5" stop-opacity="0.22"/>
+        <stop offset="1" stop-color="#3987e5" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="M0,505 L180,493 L320,497 L470,472 L610,478 L760,448 L900,456 L1030,415 L1150,410 L1280,408
+             L1280,560 L0,560 Z" fill="url(#fade)"/>
+    <path d="M0,505 L180,493 L320,497 L470,472 L610,478 L760,448 L900,456 L1030,415 L1150,410 L1280,408"
+          fill="none" stroke="#3987e5" stroke-width="4" stroke-linejoin="round"/>
+    <circle cx="1150" cy="410" r="9" fill="#3987e5" stroke="#0d0d0d" stroke-width="4"/>
+  </svg>
+  <div class="wrap">
+    <div class="kicker">Alpaca AI Trading Agents Hackathon</div>
+    <h1><span class="sheep">🐑</span>Theta Shepherd</h1>
+    <div class="tag">An autonomous options agent whose AI committee
+      <b>argues over every trade</b>, <b>learns from its own journal</b> nightly —
+      and <b>knew when not to trade</b>.</div>
+    <div class="chips">
+      <div class="chip blue">Trading API · MLEG options</div>
+      <div class="chip">MCP server</div>
+      <div class="chip">Alpaca CLI</div>
+      <div class="chip">3-persona AI committee</div>
+      <div class="chip">Hard risk gates</div>
+    </div>
+    <div class="foot">
+      <span class="repo">github.com/rogerdemello/theta-shepherd</span>
+      <span>lablab.ai × Alpaca · paper account · Aug 28 – Sep 4 2026</span>
+    </div>
+  </div>
+</body>
+</html>
