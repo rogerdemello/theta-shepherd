@@ -5,6 +5,8 @@
   python run_agent.py --force    # run a cycle even when the market is closed
   python run_agent.py --scout    # dry run: show candidates, place no orders
   python run_agent.py --retro    # nightly retrospective: journal -> lessons.md
+  python run_agent.py --preflight  # go/no-go operational checks
+  python run_agent.py --health     # watchdog: run a cycle if the schedule died
 """
 
 import argparse
@@ -43,7 +45,19 @@ def main() -> None:
     parser.add_argument("--flatten", action="store_true", help="cancel entries and close all open spreads")
     parser.add_argument("--retro", nargs="?", const="today", metavar="YYYY-MM-DD",
                         help="run the nightly retrospective (optionally for a past date)")
+    parser.add_argument("--preflight", action="store_true", help="go/no-go operational checks")
+    parser.add_argument("--health", action="store_true",
+                        help="watchdog: run a cycle now if the schedule went stale")
     args = parser.parse_args()
+
+    if args.preflight:
+        import sys
+        from theta_shepherd.preflight import run_preflight
+        sys.exit(0 if run_preflight() else 1)
+    if args.health:
+        from theta_shepherd.preflight import run_health
+        run_health()
+        return
 
     if args.scout:
         scout()

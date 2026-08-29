@@ -7,7 +7,10 @@ from datetime import date
 from alpaca.trading.enums import OrderStatus
 from rich.console import Console
 
+import os
+import time
 import traceback
+from contextlib import contextmanager
 
 from . import cli_ops, econ_calendar
 from .committee import Committee
@@ -32,6 +35,29 @@ console = Console()
 
 TERMINAL = {OrderStatus.CANCELED, OrderStatus.EXPIRED, OrderStatus.REJECTED, OrderStatus.REPLACED}
 REPRICE_STEP = 0.03  # credit given up per reprice of an unfilled entry
+LOCK_MAX_AGE = 900   # a lock older than 15 min is from a dead process
+
+# Manual emergency brake: `touch STOP` in the project root halts new entries
+# (exits and guards keep running); delete the file to resume.
+STOP_FILE = settings.journal_dir.parent / "STOP"
+
+
+@contextmanager
+def cycle_lock():
+    """One decision cycle at a time: an overlapping scheduler firing or a
+    manual run alongside it must never double-submit orders. Yields False
+    (skip) when another live cycle holds the lock; stale locks are broken."""
+    lock = settings.journal_dir / "cycle.lock"
+    if lock.exists() and time.time() - lock.stat().st_mtime < LOCK_MAX_AGE:
+        log_event("cycle_skipped", {"reason": "another_cycle_running"})
+        yield False
+        return
+    settings.journal_dir.mkdir(parents=True, exist_ok=True)
+    lock.write_text(str(os.getpid()), encoding="utf-8")
+    try:
+        yield True
+    finally:
+        lock.unlink(missing_ok=True)
 
 
 def _cancel_and_confirm_dead(trading, order_id: str):
@@ -123,6 +149,7 @@ def reconcile(trading, state: dict) -> None:
                     _log_closed(s, final.filled_avg_price)
                 else:
                     s["status"] = "open"  # retry the exit next pass with fresh quotes
+                    s["close_attempts"] = s.get("close_attempts", 0) + 1
                     s.pop("close_order_id", None)
                     remaining.append(s)
         else:
@@ -150,6 +177,12 @@ def sync_with_broker(trading, state: dict) -> None:
     if orphans:
         console.print(f"[red]Orphan option positions (untracked):[/] {orphans}")
         log_event("orphan_positions", {"positions": orphans})
+
+
+def close_pad(attempts: int) -> float:
+    """Exit orders pay up as retries mount — a stop that isn't filling is a
+    position still bleeding: 0.03, 0.05, 0.07 … capped at 0.15."""
+    return round(min(0.03 + 0.02 * attempts, 0.15), 2)
 
 
 def should_force_close(dte: int, now_et=None) -> bool:
@@ -189,7 +222,8 @@ def manage_exits(trading, md: MarketData, state: dict) -> None:
             reason = satellite_exit_reason(value, debit, dte)
             if reason:
                 s["close_order_id"] = close_satellite(
-                    trading, s, reason, value if value is not None else debit)
+                    trading, s, reason, value if value is not None else debit,
+                    pad=close_pad(s.get("close_attempts", 0)))
                 s["status"] = "closing"
                 console.print(f"[yellow]Satellite exit ({reason}):[/] "
                               f"{s['long_symbol']} value={value}")
@@ -207,7 +241,9 @@ def manage_exits(trading, md: MarketData, state: dict) -> None:
             reason = "expiry_close"
 
         if reason:
-            s["close_order_id"] = close_spread(trading, s, reason, cost if cost is not None else credit)
+            s["close_order_id"] = close_spread(trading, s, reason,
+                                               cost if cost is not None else credit,
+                                               pad=close_pad(s.get("close_attempts", 0)))
             s["status"] = "closing"
             console.print(f"[yellow]Exit ({reason}):[/] {s['short_symbol']} cost={cost}")
 
@@ -292,6 +328,14 @@ def gate_decision(account_summary: dict, open_spreads: list[dict],
 
 
 def run_cycle(force: bool = False) -> None:
+    with cycle_lock() as acquired:
+        if not acquired:
+            console.print("[yellow]Another cycle holds the lock — skipping.[/]")
+            return
+        _run_cycle(force)
+
+
+def _run_cycle(force: bool = False) -> None:
     trading = make_trading_client()
     md = MarketData()
 
@@ -329,6 +373,10 @@ def run_cycle(force: bool = False) -> None:
     if risk.day_pnl <= -settings.daily_loss_limit:
         console.print("[red]Daily loss limit hit — no new entries today.[/]")
         log_event("halted", {"reason": "daily_loss_limit", **account_summary})
+        return
+    if STOP_FILE.exists():
+        console.print("[red]STOP file present — exits managed, no new entries.[/]")
+        log_event("halted", {"reason": "manual_stop_file"})
         return
     blackout = econ_calendar.entry_blackout()
     if blackout:

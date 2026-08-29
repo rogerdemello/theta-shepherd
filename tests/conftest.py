@@ -15,6 +15,7 @@ def tmp_journal(tmp_path, monkeypatch):
     import theta_shepherd.journal as journal
     monkeypatch.setattr(journal, "settings", SimpleNamespace(journal_dir=tmp_path))
     monkeypatch.setattr(journal, "STATE_FILE", tmp_path / "state.json")
+    monkeypatch.setattr(journal, "STATE_BACKUP", tmp_path / "state.json.bak")
     return tmp_path
 
 
