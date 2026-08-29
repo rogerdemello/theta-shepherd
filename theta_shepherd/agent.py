@@ -52,7 +52,9 @@ def reconcile(trading, state: dict) -> None:
                 s["status"] = "open"
                 s["filled_credit"] = abs(float(order.filled_avg_price or s["limit_credit"]))
                 log_event("entry_filled", {"client_order_id": s["client_order_id"],
-                                           "filled_credit": s["filled_credit"]})
+                                           "filled_credit": s["filled_credit"],
+                                           "qty": s["qty"],
+                                           "short_symbol": s["short_symbol"]})
                 remaining.append(s)
             elif order.status in TERMINAL:
                 log_event("entry_dead", {"client_order_id": s["client_order_id"],
@@ -64,6 +66,10 @@ def reconcile(trading, state: dict) -> None:
                 if final.status == OrderStatus.FILLED:
                     s["status"] = "open"
                     s["filled_credit"] = abs(float(final.filled_avg_price or s["limit_credit"]))
+                    log_event("entry_filled", {"client_order_id": s["client_order_id"],
+                                               "filled_credit": s["filled_credit"],
+                                               "qty": s["qty"],
+                                               "short_symbol": s["short_symbol"]})
                     remaining.append(s)
                     continue
                 new_credit = round(s["limit_credit"] - REPRICE_STEP, 2)

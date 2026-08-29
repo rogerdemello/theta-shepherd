@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theta Shepherd — flock dashboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,0.10);
+    --series: #2a78d6; --series-soft: rgba(42,120,214,0.12);
+    --good-text: #006300; --bad-text: #d03b3b;
+    --chip-good: #0ca30c; --chip-serious: #ec835a; --chip-critical: #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19;
+      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+      --series: #3987e5; --series-soft: rgba(57,135,229,0.18);
+      --good-text: #0ca30c; --bad-text: #e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,0.10);
+    --series: #3987e5; --series-soft: rgba(57,135,229,0.18);
+    --good-text: #0ca30c; --bad-text: #e66767;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px; line-height: 1.45;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 60px; }
+  header h1 { font-size: 22px; margin: 0 0 2px; }
+  header .sub { color: var(--ink-2); margin-bottom: 20px; }
+  header .sub code { color: var(--muted); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+           gap: 12px; margin-bottom: 20px; }
+  .tile { background: var(--surface); border: 1px solid var(--ring);
+          border-radius: 10px; padding: 12px 14px; }
+  .tile .label { color: var(--ink-2); font-size: 12px; }
+  .tile .value { font-size: 24px; font-weight: 650; margin-top: 2px; }
+  .tile .note { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .pos { color: var(--good-text); } .neg { color: var(--bad-text); }
+
+  .card { background: var(--surface); border: 1px solid var(--ring);
+          border-radius: 10px; padding: 16px 18px; margin-bottom: 20px; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; }
+  .card h2 .hint { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 8px; }
+
+  .chart-box { position: relative; }
+  svg text { font-family: inherit; font-size: 11px; fill: var(--muted);
+             font-variant-numeric: tabular-nums; }
+  .tooltip { position: absolute; pointer-events: none; display: none;
+             background: var(--surface); border: 1px solid var(--ring);
+             border-radius: 6px; padding: 6px 9px; font-size: 12px;
+             box-shadow: 0 2px 8px rgba(0,0,0,.12); white-space: nowrap; z-index: 5; }
+  .tooltip .t-val { font-weight: 600; }
+
+  .meter { margin: 6px 0 2px; }
+  .meter .track { position: relative; height: 22px; background: var(--grid);
+                  border-radius: 4px; overflow: visible; }
+  .meter .fill { position: absolute; inset: 0 auto 0 0; background: var(--series);
+                 border-radius: 4px 0 0 4px; }
+  .meter .mark { position: absolute; top: -4px; bottom: -4px; width: 2px;
+                 background: var(--ink-2); }
+  .meter { margin-top: 10px; }
+  .meter .mark span { position: absolute; top: calc(100% + 6px); transform: translateX(-50%);
+                      font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+  .meter .legendline { color: var(--ink-2); font-size: 12px; margin-top: 30px; }
+
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th { text-align: left; color: var(--ink-2); font-weight: 600; font-size: 12px;
+       border-bottom: 1px solid var(--axis); padding: 6px 8px; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--grid); }
+  td.num, th.num { text-align: right; }
+  .status { font-size: 12px; color: var(--ink-2); }
+
+  .debate { border-top: 1px solid var(--grid); padding-top: 12px; margin-top: 12px; }
+  .debate:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+  .debate .when { color: var(--muted); font-size: 12px; }
+  .debate .verdict { margin: 6px 0 10px; }
+  .personas { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+              gap: 10px; }
+  .persona { border: 1px solid var(--ring); border-radius: 8px; padding: 10px 12px; }
+  .persona .name { font-weight: 600; font-size: 13px; }
+  .chip { display: inline-block; font-size: 11px; font-weight: 600;
+          padding: 1px 8px; border-radius: 10px; margin-left: 6px;
+          border: 1px solid var(--ring); color: var(--ink-2); }
+  .chip.risk_on { border-color: var(--chip-good); }
+  .chip.risk_off { border-color: var(--chip-serious); }
+  .persona .view { color: var(--ink-2); font-size: 12.5px; margin: 6px 0; }
+  .persona ul { margin: 0; padding-left: 16px; font-size: 12.5px; }
+  .persona li { margin: 2px 0; }
+  .vote-a { color: var(--good-text); font-weight: 600; }
+  .vote-r { color: var(--bad-text); font-weight: 600; }
+  .summary { background: var(--series-soft); border-radius: 8px;
+             padding: 10px 12px; margin-top: 10px; font-size: 13px; }
+
+  .timeline { max-height: 380px; overflow-y: auto; }
+  .timeline .row { display: flex; gap: 10px; padding: 5px 0;
+                   border-bottom: 1px solid var(--grid); font-size: 12.5px; }
+  .timeline .ts { color: var(--muted); flex: 0 0 118px;
+                  font-variant-numeric: tabular-nums; }
+  .timeline .ev { flex: 0 0 128px; font-weight: 600; color: var(--ink-2); }
+  .timeline .detail { color: var(--ink-2); overflow-wrap: anywhere; }
+
+  .lessons pre { white-space: pre-wrap; font-family: inherit; font-size: 13px;
+                 color: var(--ink-2); margin: 0; }
+  .empty { color: var(--muted); font-style: italic; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🐑 Theta Shepherd</h1>
+    <div class="sub">Autonomous options premium-selling agent ·
+      Alpaca paper account <code id="acct"></code> · generated <span id="gen"></span></div>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="card">
+    <h2>Equity curve <span class="hint">from cycle snapshots (paper account, $100k start)</span></h2>
+    <div class="chart-box" id="equity-chart"><div class="tooltip" id="eq-tip"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Risk ladder <span class="hint">committed risk vs. today's cap — the cap earns +$2k per green day</span></h2>
+    <div class="meter" id="risk-meter"></div>
+  </div>
+
+  <div class="card">
+    <h2>The flock <span class="hint">open spreads</span></h2>
+    <div id="flock"></div>
+  </div>
+
+  <div class="card">
+    <h2>Closed spreads <span class="hint">realized</span></h2>
+    <div id="closed"></div>
+  </div>
+
+  <div class="card">
+    <h2>Committee debates <span class="hint">three personas argue, the Chair decides — newest first</span></h2>
+    <div id="debates"></div>
+  </div>
+
+  <div class="card">
+    <h2>What the shepherd learned <span class="hint">nightly retrospective → next day's prompts</span></h2>
+    <div class="lessons" id="lessons"></div>
+  </div>
+
+  <div class="card">
+    <h2>Decision timeline</h2>
+    <div class="timeline" id="timeline"></div>
+  </div>
+
+  <footer>Theta Shepherd · Alpaca AI Trading Agents Hackathon · paper trading — simulated results.</footer>
+</div>
+
+<script id="data" type="application/json">{"generated": "2026-08-29 07:03 UTC", "account_id": "PA31OBPWA7MW", "stats": {"equity": 100015.8, "day_pnl": 15.80000000000291, "realized_pnl": 0, "premium_collected": 202.0, "committed_risk": 1652.0, "risk_cap": 4000.0, "hard_cap": 10000.0, "open_count": 1}, "equity_series": [{"ts": "2026-08-28T16:41:44.012356+00:00", "equity": 100000.0}, {"ts": "2026-08-28T16:57:01.590047+00:00", "equity": 99989.9}, {"ts": "2026-08-29T07:03:41.673819+00:00", "equity": 100015.8}], "flock": [{"symbol": "QQQ260904C00728000", "kind": "call_credit", "underlying": "QQQ", "qty": 2, "strikes": "728.0/733.0", "expiration": "2026-09-04", "credit": 1.01, "max_loss": 804.0000000000001, "status": "open"}, {"symbol": "QQQ260904P00704000", "kind": "put_credit", "underlying": "QQQ", "qty": 2, "strikes": "704.0/699.0", "expiration": "2026-09-04", "credit": 0.76, "max_loss": 848.0, "status": "pending_fill"}], "closed": [], "debates": [{"ts": "2026-08-29T06:46:51.302868+00:00", "opinions": {"macro_analyst": {"stance": "neutral", "votes": [{"index": 0, "vote": "reject", "reason": "The put credit spread expires just after the ISM Manufacturing PMI release, which introduces event-driven gap risk."}, {"index": 1, "vote": "reject", "reason": "The call credit spread also expires after the ISM Manufacturing PMI release, exposing the trade to headline risk."}], "view": "With ISM Manufacturing PMI and NFP on the macro calendar this week, the risk of event-driven volatility is elevated. The current portfolio already has exposure to both sides of the market with QQQ spreads, so adding more trades with overlapping expirations increases unnecessary risk. Focus should remain on managing existing positions and reassessing after the ISM release."}, "vol_trader": {"stance": "neutral", "votes": [{"index": 0, "vote": "approve", "reason": "The SPY put credit spread offers a strong POP (0.82), decent EV per lot (14.2), and OTM percentage (2.1%), with strikes outside the expected move."}, {"index": 1, "vote": "reject", "reason": "The SPY call credit spread has a lower POP (0.76), weaker EV per lot (8.9), and strikes closer to the expected move, making it less favorable."}], "view": "The current market environment appears range-bound, supported by recent headlines and mixed macro signals. The SPY put credit spread aligns well with the agent's strategy, while the call credit spread lacks sufficient edge given its weaker metrics. Focus on high-POP, high-EV setups with strikes outside the expected move for capital efficiency."}, "risk_officer": {"stance": "neutral", "votes": [{"index": 0, "vote": "reject", "reason": "Adding SPY put credit spread increases concentration risk in similar ETFs with overlapping expirations and could amplify path risk near macro events."}, {"index": 1, "vote": "reject", "reason": "SPY call credit spread introduces stacking risk with QQQ call spread and raises correlation concerns given similar underlying and expiration."}], "view": "The account is moderately committed with 41% of the risk cap utilized, but the existing QQQ spreads already concentrate exposure to a single underlying and expiration. Adding SPY spreads would increase correlation and stacking risks, especially ahead of significant macro events like ISM PMI and NFP, which could induce volatility."}}, "decision": {"approved": [], "market_view": "The market appears range-bound based on recent headlines and mixed macro signals, but upcoming macro events like ISM Manufacturing PMI and NFP introduce significant event-driven volatility risks. The existing QQQ spreads already provide balanced exposure, and further trades with overlapping expirations could amplify risk unnecessarily.", "debate_summary": "The Macro Analyst and Risk Officer both rejected all candidates due to elevated event-driven risks and concerns about concentration and correlation with existing positions. While the Vol Trader found merit in the SPY put credit spread's metrics, the broader consensus highlighted the risks of adding trades ahead of key macro events. The decision to approve no new trades reflects a cautious approach to managing portfolio risk in a volatile environment."}}], "timeline": [{"ts": "2026-08-29T06:46:07.815206+00:00", "event": "retrospective", "detail": "Today's trading focused on initiating two QQQ credit spreads, one call and one put, with mixed market signals suggesting range-bound strategies. The call spread"}, {"ts": "2026-08-28T16:56:59.438679+00:00", "event": "entry_repriced", "detail": "working order, new credit 0.76"}, {"ts": "2026-08-28T16:56:58.443095+00:00", "event": "entry_filled", "detail": "filled @ 1.01 credit"}, {"ts": "2026-08-28T16:42:09.411960+00:00", "event": "order_submitted", "detail": "put_credit QQQ 704.0/699.0 x2 @ 0.79 credit"}, {"ts": "2026-08-28T16:42:09.161731+00:00", "event": "order_submitted", "detail": "call_credit QQQ 728.0/733.0 x2 @ 1.01 credit"}], "lessons": "# Shepherd's lessons\n\nWritten nightly by the retrospective; read by the committee.\n\n## 2026-08-28\n\nToday's trading focused on initiating two QQQ credit spreads, one call and one put, with mixed market signals suggesting range-bound strategies. The call spread filled at a favorable credit, while the put spread required repricing before filling, leading to a slight reduction in credit received.\n\n**Lessons:**\n- QQQ call credit spreads with short strikes near 0.22 delta and limit credits close to mid-price (e.g., 1.01 vs. 1.03) fill efficiently and maintain favorable metrics \u2014 prioritize similar setups tomorrow.\n- QQQ put credit spreads with short strikes near -0.23 delta may require repricing to fill, as seen with the repriced credit at 0.76 vs. initial limit of 0.79 \u2014 consider starting closer to mid-price for faster fills.\n- Avoid initiating new trades during periods of heightened macroeconomic uncertainty, as indicated by today's mixed headlines and upcoming data releases.\n- Monitor the effective credit received versus the expected credit for each spread, as deviations (e.g., put spread repricing) can impact overall profitability.\n- Ensure that the entry process for each spread aligns with the stated rationale and market view to avoid overcommitting risk during volatile conditions.\n\n**Keep doing:**\n- Focusing on QQQ credit spreads with manageable deltas and favorable OTM percentages during range-bound market conditions.\n- Using a balanced approach by diversifying between call and put spreads to hedge directional risk.\n"}</script>
+<script>
+const D = JSON.parse(document.getElementById('data').textContent);
+const $ = (id) => document.getElementById(id);
+const fmt$ = (v, dp=0) => v == null ? '—' :
+  (v < 0 ? '-' : '') + '$' + Math.abs(v).toLocaleString('en-US',
+    {minimumFractionDigits: dp, maximumFractionDigits: dp});
+const cls = (v) => v == null ? '' : (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
+const sign$ = (v) => v == null ? '—' : (v >= 0 ? '+' : '-') + '$' +
+  Math.abs(v).toLocaleString('en-US', {maximumFractionDigits: 0});
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const shortTs = (iso) => {
+  const d = new Date(iso);
+  return d.toLocaleString('en-US', {month:'short', day:'numeric',
+    hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'America/New_York'}) + ' ET';
+};
+
+$('acct').textContent = D.account_id;
+$('gen').textContent = D.generated;
+
+/* ---- stat tiles ---- */
+const s = D.stats;
+$('tiles').innerHTML = [
+  {label:'Equity', v: fmt$(s.equity, 0), c: ''},
+  {label:'Day P&L', v: sign$(s.day_pnl), c: cls(s.day_pnl)},
+  {label:'Realized P&L', v: sign$(s.realized_pnl), c: cls(s.realized_pnl)},
+  {label:'Premium collected', v: fmt$(s.premium_collected), c: ''},
+  {label:'Open spreads', v: s.open_count, c: ''},
+].map(t => `<div class="tile"><div class="label">${t.label}</div>
+  <div class="value ${t.c}">${t.v}</div></div>`).join('');
+
+/* ---- equity line chart (single series, crosshair + tooltip) ---- */
+(function equityChart() {
+  const box = $('equity-chart'), pts = D.equity_series;
+  if (pts.length < 2) {
+    box.insertAdjacentHTML('beforeend',
+      '<div class="empty">Not enough snapshots yet — the curve grows as cycles run.</div>');
+    return;
+  }
+  const W = Math.min(box.clientWidth || 1000, 1020), H = 240,
+        m = {t: 14, r: 66, b: 24, l: 8};
+  const xs = pts.map(p => new Date(p.ts).getTime());
+  const ys = pts.map(p => p.equity);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const pad = Math.max((y1 - y0) * 0.15, 40); y0 -= pad; y1 += pad;
+  const X = t => m.l + (t - x0) / (x1 - x0 || 1) * (W - m.l - m.r);
+  const Y = v => m.t + (1 - (v - y0) / (y1 - y0)) * (H - m.t - m.b);
+
+  const yticks = 4, grid = [], ylab = [];
+  for (let i = 0; i <= yticks; i++) {
+    const v = y0 + (y1 - y0) * i / yticks, y = Y(v);
+    grid.push(`<line x1="${m.l}" y1="${y}" x2="${W - m.r}" y2="${y}"
+      stroke="var(--grid)" stroke-width="1"/>`);
+    ylab.push(`<text x="${W - m.r + 6}" y="${y + 4}">${fmt$(v)}</text>`);
+  }
+  const xlab = [], seen = [];
+  for (const i of [0, Math.floor((pts.length - 1) / 2), pts.length - 1]) {
+    const label = new Date(xs[i]).toLocaleString('en-US', {month:'short',
+      day:'numeric', timeZone:'America/New_York'});
+    const px = X(xs[i]);
+    if (seen.some(s => s.label === label || Math.abs(s.px - px) < 70)) continue;
+    seen.push({label, px});
+    xlab.push(`<text x="${px}" y="${H - 6}" text-anchor="middle">${label}</text>`);
+  }
+
+  const path = pts.map((p, i) =>
+    `${i ? 'L' : 'M'}${X(xs[i]).toFixed(1)},${Y(ys[i]).toFixed(1)}`).join('');
+  const last = pts.length - 1;
+
+  box.insertAdjacentHTML('beforeend', `
+  <svg viewBox="0 0 ${W} ${H}" width="100%" role="img"
+       aria-label="Equity over time">
+    ${grid.join('')}
+    <line x1="${m.l}" y1="${H - m.b}" x2="${W - m.r}" y2="${H - m.b}"
+          stroke="var(--axis)" stroke-width="1"/>
+    <path d="${path}" fill="none" stroke="var(--series)" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${X(xs[last])}" cy="${Y(ys[last])}" r="4" fill="var(--series)"
+            stroke="var(--surface)" stroke-width="2"/>
+    <line id="eq-cross" x1="0" y1="${m.t}" x2="0" y2="${H - m.b}"
+          stroke="var(--axis)" stroke-width="1" style="display:none"/>
+    <circle id="eq-dot" r="4.5" fill="var(--series)" stroke="var(--surface)"
+            stroke-width="2" style="display:none"/>
+    ${ylab.join('')}${xlab.join('')}
+  </svg>`);
+
+  const svg = box.querySelector('svg'), tip = $('eq-tip'),
+        cross = $('eq-cross'), dot = $('eq-dot');
+  svg.addEventListener('mousemove', ev => {
+    const r = svg.getBoundingClientRect();
+    const mx = (ev.clientX - r.left) * W / r.width;
+    let best = 0, bd = Infinity;
+    pts.forEach((p, i) => { const d = Math.abs(X(xs[i]) - mx);
+      if (d < bd) { bd = d; best = i; } });
+    const px = X(xs[best]), py = Y(ys[best]);
+    cross.style.display = dot.style.display = '';
+    cross.setAttribute('x1', px); cross.setAttribute('x2', px);
+    dot.setAttribute('cx', px); dot.setAttribute('cy', py);
+    tip.style.display = 'block';
+    tip.innerHTML = `<div>${shortTs(pts[best].ts)}</div>
+      <div class="t-val">${fmt$(ys[best], 2)}</div>`;
+    const bx = box.getBoundingClientRect();
+    let lx = px * r.width / W + 12;
+    if (lx + tip.offsetWidth > bx.width - 8) lx -= tip.offsetWidth + 24;
+    tip.style.left = lx + 'px';
+    tip.style.top = (py * r.height / H - 14) + 'px';
+  });
+  svg.addEventListener('mouseleave', () => {
+    tip.style.display = 'none';
+    cross.style.display = dot.style.display = 'none';
+  });
+})();
+
+/* ---- risk meter ---- */
+(function riskMeter() {
+  const hard = s.hard_cap, cap = s.risk_cap, used = s.committed_risk;
+  const pct = v => Math.min(100, v / hard * 100).toFixed(1) + '%';
+  $('risk-meter').innerHTML = `
+    <div class="track">
+      <div class="fill" style="width:${pct(used)}"></div>
+      <div class="mark" style="left:${pct(cap)}"><span>today's cap ${fmt$(cap)}</span></div>
+      <div class="mark" style="left:calc(100% - 1px)"><span style="transform:translateX(-100%)">ceiling ${fmt$(hard)}</span></div>
+    </div>
+    <div class="legendline">Committed <strong>${fmt$(used)}</strong> of ${fmt$(cap)} available
+      (${(used / cap * 100).toFixed(0)}% of today's cap; hard ceiling ${fmt$(hard)}).</div>`;
+})();
+
+/* ---- tables ---- */
+function table(rows, cols) {
+  if (!rows.length) return '<div class="empty">None.</div>';
+  return `<div style="overflow-x:auto"><table><thead><tr>${
+    cols.map(c => `<th class="${c.num ? 'num' : ''}">${c.h}</th>`).join('')
+  }</tr></thead><tbody>${rows.map(r => `<tr>${
+    cols.map(c => `<td class="${c.num ? 'num' : ''}">${c.f(r)}</td>`).join('')
+  }</tr>`).join('')}</tbody></table></div>`;
+}
+$('flock').innerHTML = table(D.flock, [
+  {h:'Underlying', f: r => esc(r.underlying)},
+  {h:'Spread', f: r => `${esc(r.kind).replace('_',' ')} ${esc(r.strikes)}`},
+  {h:'Expiry', f: r => esc(r.expiration)},
+  {h:'Qty', num:1, f: r => r.qty},
+  {h:'Credit', num:1, f: r => r.credit != null ? '$' + Number(r.credit).toFixed(2) : '—'},
+  {h:'Max loss', num:1, f: r => fmt$(r.max_loss)},
+  {h:'Status', f: r => `<span class="status">${esc(r.status)}</span>`},
+]);
+$('closed').innerHTML = table(D.closed, [
+  {h:'Closed', f: r => shortTs(r.ts)},
+  {h:'Underlying', f: r => esc(r.underlying)},
+  {h:'Spread', f: r => `${esc(r.kind).replace('_',' ')} ${esc(r.strikes)}`},
+  {h:'Qty', num:1, f: r => r.qty},
+  {h:'Close debit', num:1, f: r => r.close_debit != null ?
+      '$' + Number(r.close_debit).toFixed(2) : '—'},
+  {h:'P&L', num:1, f: r => `<span class="${cls(r.pnl)}">${sign$(r.pnl)}</span>`},
+]);
+
+/* ---- committee debates ---- */
+const PERSONA_NAMES = {macro_analyst: 'Macro Analyst', vol_trader: 'Vol Trader',
+                       risk_officer: 'Risk Officer'};
+const STANCE = {risk_on: 'risk-on', neutral: 'neutral', risk_off: 'risk-off'};
+$('debates').innerHTML = D.debates.length ? D.debates.map(d => {
+  const dec = d.decision || {};
+  const n = (dec.approved || []).length;
+  const personas = Object.entries(d.opinions || {}).map(([k, o]) => `
+    <div class="persona">
+      <span class="name">${PERSONA_NAMES[k] || esc(k)}</span>
+      <span class="chip ${esc(o.stance || '')}">${STANCE[o.stance] || 'n/a'}</span>
+      <div class="view">${esc(o.view || o._error || '')}</div>
+      <ul>${(o.votes || []).map(v => `<li><span class="${
+        v.vote === 'approve' ? 'vote-a' : 'vote-r'}">${
+        v.vote === 'approve' ? '✓ approve' : '✗ reject'}</span>
+        #${v.index}: ${esc(v.reason || '')}</li>`).join('')}</ul>
+    </div>`).join('');
+  return `<div class="debate">
+    <div class="when">${shortTs(d.ts)}</div>
+    <div class="verdict"><strong>Chair:</strong> ${n ? n + ' trade' +
+      (n > 1 ? 's' : '') + ' approved' : 'no trades'} — ${esc(dec.market_view || '')}</div>
+    <div class="personas">${personas}</div>
+    ${dec.debate_summary ? `<div class="summary"><strong>Debate:</strong> ${
+      esc(dec.debate_summary)}</div>` : ''}
+  </div>`;
+}).join('') : '<div class="empty">No debates journaled yet.</div>';
+
+/* ---- lessons + timeline ---- */
+$('lessons').innerHTML = D.lessons
+  ? `<pre>${esc(D.lessons)}</pre>`
+  : '<div class="empty">The first retrospective runs after the next session.</div>';
+
+$('timeline').innerHTML = D.timeline.length ? D.timeline.map(e => `
+  <div class="row"><div class="ts">${shortTs(e.ts)}</div>
+    <div class="ev">${esc(e.event)}</div>
+    <div class="detail">${esc(e.detail)}</div></div>`).join('')
+  : '<div class="empty">No events yet.</div>';
+</script>
+</body>
+</html>
