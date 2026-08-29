@@ -23,9 +23,8 @@ strictly bounded downside, and daily compounding of small wins. Final result:
    event-gap risk), a **Vol Trader** (is the premium worth selling?), and a **Risk
    Officer** (concentration, correlation, path risk — their veto weighs heaviest). A
    **Chair** reads all three opinions and rules; approving zero trades is an
-   explicitly good outcome. With a Featherless AI key configured, the Vol Trader runs
-   on an open-source model — different weights arguing, not one model in three hats.
-   Every debate is journaled and replayable on the dashboard.
+   explicitly good outcome. Every debate is journaled and replayable on the
+   dashboard.
 3. **The satellite sleeve.** Only when all three personas independently call the same
    market direction may the agent buy one directional debit spread (≤ $2,000 risk,
    +50%/−50% exits, never held into its final day). Unanimity among adversarial

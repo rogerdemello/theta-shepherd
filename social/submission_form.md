@@ -19,8 +19,8 @@ credit spreads (iron condors) on SPY, QQQ and IWM in Alpaca's paper environment.
 
 A deterministic quant scout pulls option chains with Greeks from Alpaca's Market
 Data API and ranks delta-targeted verticals by expected value. But no single AI
-decides: a Trading Committee of three personas — a Macro Analyst, a Vol Trader
-(running on an open-source model via Featherless AI), and a Risk Officer — reviews
+decides: a Trading Committee of three personas — a Macro Analyst, a Vol Trader,
+and a Risk Officer — reviews
 every candidate in independent model calls, and a Chair synthesizes their votes.
 Approving zero trades is an explicitly good outcome. When all three independently
 agree on market direction — rare by design — the agent may spend that conviction on
@@ -48,8 +48,7 @@ Results: 【N trades, win rate, P&L, max drawdown】.
 ## Technology & category tags
 
 Alpaca Trading API · Alpaca MCP Server · Alpaca CLI · Options Trading ·
-Azure OpenAI (GPT-4o) · Featherless AI · Python · Multi-Agent / AI Committee ·
-Autonomous Agent
+Azure OpenAI (GPT-4o) · Python · Multi-Agent / AI Committee · Autonomous Agent
 
 ## Links & assets
 

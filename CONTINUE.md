@@ -81,7 +81,7 @@ During market days, run cycles every ~20–30 min (`--loop` or Task Scheduler �
 
 ## Still TODO
 
-- Optional: Featherless AI persona (partner tech; needs user to claim $25 credits)
+- ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.
 - Mon–Wed: daily verify fills / regenerate+push dashboard (Pages) / post; Wed flatten check; Thu video+slides+writeup+regenerate keys+submit
 - User actions pending: post #1 and #2 on X/LinkedIn; delete the two private dashboard artifacts at claude.ai/code/artifacts
 
