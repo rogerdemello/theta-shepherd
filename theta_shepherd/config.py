@@ -33,8 +33,15 @@ class Settings:
     azure_deployment: str = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o")
     azure_api_version: str = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
 
+    # Featherless AI (optional): when a key is present, the Vol Trader persona
+    # runs on an open-source model — a committee of different minds, not one
+    # model role-playing three seats.
+    featherless_api_key: str = os.getenv("FEATHERLESS_API_KEY", "")
+    featherless_base_url: str = os.getenv("FEATHERLESS_BASE_URL", "https://api.featherless.ai/v1")
+    featherless_model: str = os.getenv("FEATHERLESS_MODEL", "Qwen/Qwen2.5-72B-Instruct")
+
     # Universe: liquid ETFs with penny-wide option markets and daily expirations
-    underlyings: list[str] = field(default_factory=lambda: _env_list("UNDERLYINGS", ["SPY", "QQQ"]))
+    underlyings: list[str] = field(default_factory=lambda: _env_list("UNDERLYINGS", ["SPY", "QQQ", "IWM"]))
 
     # Spread construction
     min_dte: int = 1            # avoid same-day gamma risk
@@ -42,7 +49,12 @@ class Settings:
     short_delta_lo: float = 0.12   # |delta| band for the short strike
     short_delta_hi: float = 0.25
     spread_width: float = 5.0      # dollars between strikes
+    # Cheaper underlyings need narrower spreads to keep credit/width viable
+    spread_width_overrides: dict[str, float] = field(default_factory=lambda: {"IWM": 3.0})
     min_credit_frac: float = 0.15  # credit must be >= 15% of width
+
+    def width_for(self, underlying: str) -> float:
+        return self.spread_width_overrides.get(underlying.upper(), self.spread_width)
 
     # Risk gates (dollars, per $100k account)
     max_risk_per_trade: float = _env_float("MAX_RISK_PER_TRADE", 2_000.0)

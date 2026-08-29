@@ -338,6 +338,7 @@ $('debates').innerHTML = D.debates.length ? D.debates.map(d => {
       <span class="chip ${esc(o.stance || '')}">${STANCE[o.stance] || 'n/a'}</span>${
       o.directional_view && o.directional_view !== 'neutral'
         ? ` <span class="chip">${esc(o.directional_view)}</span>` : ''}
+      ${o._model ? `<div style="color:var(--muted);font-size:11px;margin-top:2px">${esc(o._model)}</div>` : ''}
       <div class="view">${esc(o.view || o._error || '')}</div>
       <ul>${(o.votes || []).map(v => `<li><span class="${
         v.vote === 'approve' ? 'vote-a' : 'vote-r'}">${

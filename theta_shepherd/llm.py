@@ -22,23 +22,48 @@ def azure_client() -> AzureOpenAI:
     )
 
 
-def chat_json(client: AzureOpenAI, system: str, user_payload: str,
-              temperature: float = 0.2) -> dict:
-    """One JSON-mode chat completion; returns {} -shaped dict even on bad output."""
-    response = client.chat.completions.create(
-        model=settings.azure_deployment,
-        response_format={"type": "json_object"},
+def featherless_client():
+    """OpenAI-compatible client for Featherless AI (open-source models)."""
+    from openai import OpenAI
+    return OpenAI(base_url=settings.featherless_base_url,
+                  api_key=settings.featherless_api_key)
+
+
+def extract_json(raw: str) -> dict:
+    """Parse a JSON object out of model output, tolerating code fences and
+    surrounding prose (open-source models sometimes ignore JSON mode)."""
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    start, end = raw.find("{"), raw.rfind("}")
+    if start != -1 and end > start:
+        try:
+            return json.loads(raw[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+    return {"_error": f"unparseable LLM output: {raw[:200]}"}
+
+
+def chat_json(client, system: str, user_payload: str,
+              temperature: float = 0.2, model: str | None = None) -> dict:
+    """One JSON chat completion against any OpenAI-compatible client; returns
+    a dict even on bad output. Falls back to plain mode for servers that
+    reject response_format."""
+    kwargs = dict(
+        model=model or settings.azure_deployment,
         temperature=temperature,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user_payload},
         ],
     )
-    raw = response.choices[0].message.content or "{}"
     try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return {"_error": f"unparseable LLM output: {raw[:200]}"}
+        response = client.chat.completions.create(
+            response_format={"type": "json_object"}, **kwargs)
+    except Exception:
+        response = client.chat.completions.create(**kwargs)
+    return extract_json(response.choices[0].message.content or "{}")
 
 
 def sanitize_approvals(decision: dict, n_candidates: int) -> dict:

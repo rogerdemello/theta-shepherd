@@ -14,7 +14,7 @@ import json
 
 from .config import settings
 from .journal import log_event
-from .llm import azure_client, chat_json, sanitize_approvals
+from .llm import azure_client, chat_json, featherless_client, sanitize_approvals
 from .retro import load_lessons
 
 _CONTEXT = """The agent sells defined-risk credit spreads (1-7 DTE,
@@ -100,7 +100,19 @@ class Committee:
 
         opinions: dict[str, dict] = {}
         for name, prompt in PERSONAS.items():
-            opinions[name] = chat_json(self.client, prompt, evidence_json, temperature=0.4)
+            client, model = persona_backend(name, self.client)
+            try:
+                op = chat_json(client, prompt, evidence_json,
+                               temperature=0.4, model=model)
+            except Exception:
+                if model == settings.azure_deployment:
+                    raise
+                # Open-source backend unavailable — this seat falls back to
+                # Azure rather than silencing a committee member.
+                op = chat_json(self.client, prompt, evidence_json, temperature=0.4)
+                model = f"{settings.azure_deployment} (featherless fallback)"
+            op["_model"] = model
+            opinions[name] = op
 
         chair_payload = json.dumps({**evidence, "committee_opinions": opinions}, indent=2)
         decision = chat_json(
@@ -130,6 +142,15 @@ class Committee:
 
         log_event("committee_debate", {"opinions": opinions, "decision": decision})
         return decision
+
+
+def persona_backend(name: str, azure) -> tuple[object, str]:
+    """Which model answers for this seat. With a Featherless key configured,
+    the Vol Trader runs on an open-source model — genuinely different weights
+    arguing with the Azure members, not one model in three hats."""
+    if name == "vol_trader" and settings.featherless_api_key:
+        return featherless_client(), settings.featherless_model
+    return azure, settings.azure_deployment
 
 
 def unanimous_direction(opinions: dict[str, dict]) -> str | None:

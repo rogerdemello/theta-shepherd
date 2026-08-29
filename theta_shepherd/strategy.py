@@ -129,7 +129,7 @@ def find_satellite_candidate(
     """Best available near-the-money vertical debit spread in the committee's
     direction, or None when nothing passes the cost filter."""
     price = md.last_price(underlying)
-    width = settings.spread_width
+    width = settings.width_for(underlying)
     if direction == "bullish":
         quotes = md.chain(underlying, ContractType.CALL, price * 0.97, price * 1.08,
                           settings.satellite_min_dte, settings.max_dte)
@@ -162,25 +162,26 @@ def find_satellite_candidate(
 
 
 def _pair_spreads(
-    quotes: list[OptionQuote], kind: str, price: float
+    quotes: list[OptionQuote], kind: str, price: float, width: float | None = None
 ) -> list[SpreadCandidate]:
     by_key = {(q.expiration, q.strike): q for q in quotes}
     out = []
     for q in quotes:
+        w = width if width is not None else settings.width_for(q.underlying)
         d = q.delta
         if d is None or not (settings.short_delta_lo <= abs(d) <= settings.short_delta_hi):
             continue
-        long_strike = q.strike - settings.spread_width if kind == "put_credit" else q.strike + settings.spread_width
+        long_strike = q.strike - w if kind == "put_credit" else q.strike + w
         lng = by_key.get((q.expiration, long_strike))
         if lng is None:
             continue
         credit = q.bid - lng.ask  # what we can actually collect crossing the spread
-        if credit < settings.min_credit_frac * settings.spread_width:
+        if credit < settings.min_credit_frac * w:
             continue
         out.append(
             SpreadCandidate(
                 underlying=q.underlying, kind=kind, expiration=q.expiration,
-                short=q, long=lng, credit=credit, width=settings.spread_width,
+                short=q, long=lng, credit=credit, width=w,
                 underlying_price=price,
             )
         )

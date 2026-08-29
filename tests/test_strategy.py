@@ -38,6 +38,17 @@ def test_pair_spreads_filters_thin_credit():
     assert _pair_spreads([short, long], "put_credit", 643.0) == []
 
 
+def test_pair_spreads_uses_narrower_width_for_iwm():
+    assert settings.width_for("IWM") == 3.0 and settings.width_for("SPY") == 5.0
+    short = make_quote(underlying="IWM", strike=220.0, bid=0.55, ask=0.60, delta=-0.18)
+    long = make_quote(underlying="IWM", strike=217.0, bid=0.08, ask=0.10, delta=-0.09)
+    out = _pair_spreads([short, long], "put_credit", 226.0)
+    assert len(out) == 1
+    assert out[0].width == 3.0
+    assert out[0].credit == pytest.approx(0.45)   # exactly the 15%-of-width floor
+    assert out[0].max_loss == pytest.approx((3.0 - 0.45) * 100)
+
+
 def test_pair_spreads_requires_matching_long_strike():
     short = make_quote(strike=630.0, bid=1.00, ask=1.10, delta=-0.18)
     stray = make_quote(strike=620.0, bid=0.10, ask=0.15, delta=-0.05)  # not width away
