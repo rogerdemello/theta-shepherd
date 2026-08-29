@@ -47,7 +47,26 @@ During market days, run cycles every ~20–30 min (`--loop` or Task Scheduler �
 
 `strategy.py` scout (0.12–0.25Δ shorts, $5 wide, 1–7 DTE, credit ≥15% width, EV-ranked) → `llm.py` Azure OpenAI gatekeeper (approves ≤2/cycle, sizes down only, sees news + macro calendar) → `risk.py` hard gates ($2k/trade, $10k portfolio, $3k daily loss, 6 spreads max) → `execution.py` atomic MLEG limit orders (**negative limit = credit**) → `agent.py` cycle: reconcile → broker sync → exits → guards (NFP flatten, 5% drawdown kill switch, blackouts in `econ_calendar.py`) → scout → LLM → gates → execute. `cli_ops.py` shells to `alpaca-cli` each cycle (CLI requirement). `journal.py` logs everything.
 
-## Done ✅
+## Done Sat Aug 29 ✅ (weekend block 1)
+
+- **B1 Trading Committee** (`committee.py`): Macro Analyst + Vol Trader + Risk Officer (independent Azure calls) + Chair; drop-in replacement for Gatekeeper (kept as fallback); full debate journaled as `committee_debate`; `unanimous` flag per approval (satellite-sleeve plumbing ready). Live-tested: personas disagreed, chair ruled no-trade — sensible.
+- **B2 Retro** (`retro.py`): `--retro [date]` → `journal/lessons.md` (day sections, re-run replaces); `load_lessons()` injected into committee prompts. Ran for Aug 28 — real lessons written.
+- **A5 Risk ladder**: cap $4k base +$2k/green day → $10k ceiling, ET-date stepped, in `state.json` `ladder`, journaled `risk_ladder`; `entry_gates(..., portfolio_cap)`.
+- **E pytest**: 48 tests green (`python -m pytest tests/`), incl. fake-broker reconcile.
+- **E schedulers registered**: "ThetaShepherd Cycle" (Mon–Fri 19:00 IST, every 20 min for 6.5h → next fire Mon Aug 31 19:00) and "ThetaShepherd Retro" (Tue–Sat 01:45 IST). Wrappers: `scheduler_cycle.bat` / `scheduler_retro.bat` (log → `journal/scheduler.log`).
+- **C MCP**: official `alpaca-mcp-server` (PyPI, via uvx) registered in Claude Code local scope with `--env-file` → ✔ Connected. `.mcp.json.example` committed; README documents it.
+- **D Dashboard**: `dashboard.py` + `dashboard_template.html` → `docs/dashboard.html` (self-contained, light+dark, equity curve w/ hover, risk-ladder meter, flock, debate viewer, lessons, timeline). **GitHub Pages enabled** (main:/docs): https://rogerdemello.github.io/theta-shepherd/ (demo URL for submission — user said don't use Claude artifacts). Regenerate after each session: `python dashboard.py` then commit docs/.
+- **F Post #2** drafted in `social/posts.md` (committee debate; attach dashboard debate-card screenshot). Posts #1/#2 may still be unposted — check with user.
+- Journal gotcha handled: first-session events used `kind` as event key; `dashboard.py::_normalize` adapts them. `entry_filled` now logs qty+short_symbol.
+- Account is green: equity ~$100,016 (+$16 day) as of Sat.
+
+## Still TODO
+
+- A6 satellite sleeve (optional — committee `unanimous` flag ready; needs debit-spread strategy+execution path; only if time permits, it's a P&L risk)
+- Optional: Featherless AI persona (partner tech; needs user to claim $25 credits)
+- Mon–Wed: daily verify fills / screenshot dashboard / regenerate+push dashboard / post; Wed flatten check; Thu video+slides+writeup+regenerate keys+submit
+
+## Done ✅ (Fri Aug 28)
 
 - Full agent working end-to-end, live-tested during market hours (2 cycles, real fills)
 - Hardening: broker-truth sync, order working (reprice $0.03/cycle toward executable), `--flatten`, drawdown kill switch, econ calendar guard (ISM Sep 1, ADP Sep 2, Claims/ISM-Svc Sep 3, NFP Sep 4)
