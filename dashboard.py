@@ -172,6 +172,26 @@ def build_data() -> dict:
     lessons_file = settings.journal_dir / "lessons.md"
     lessons = lessons_file.read_text(encoding="utf-8") if lessons_file.exists() else ""
 
+    markers = []
+    for e in events:
+        ev = e.get("event")
+        if ev in ("order_submitted", "satellite_submitted"):
+            strikes = (f"{e.get('buy_strike')}/{e.get('sell_strike')}"
+                       if ev == "satellite_submitted"
+                       else f"{e.get('short_strike')}/{e.get('long_strike')}")
+            markers.append({"ts": e["ts"], "type": "open",
+                            "label": f"opened {e.get('kind', '?')} "
+                                     f"{e.get('underlying', '?')} {strikes} "
+                                     f"x{e.get('qty')}"})
+        elif ev in ("spread_closed", "satellite_closed"):
+            pnl = e.get("realized_pnl")
+            tag = f" {pnl:+,.0f}" if isinstance(pnl, (int, float)) else ""
+            markers.append({"ts": e["ts"], "type": "close",
+                            "pnl": pnl, "label": f"closed{tag}"})
+
+    closed_pnls = [c["pnl"] for c in closed if isinstance(c.get("pnl"), (int, float))]
+    wins = sum(1 for p in closed_pnls if p > 0)
+
     day_pnl = (acct["equity"] - acct["last_equity"]) if acct else None
     equity = acct["equity"] if acct else \
         (equity_series[-1]["equity"] if equity_series else None)
@@ -184,8 +204,11 @@ def build_data() -> dict:
             "premium_collected": premium, "committed_risk": committed,
             "risk_cap": risk_cap, "hard_cap": settings.max_portfolio_risk,
             "open_count": sum(1 for s in open_spreads if s.get("status") == "open"),
+            "closed_count": len(closed_pnls), "wins": wins,
+            "debates": len(debates),
         },
         "equity_series": equity_series,
+        "markers": markers,
         "flock": flock, "closed": closed,
         "debates": debates[::-1],       # newest first
         "timeline": timeline[::-1][:80],

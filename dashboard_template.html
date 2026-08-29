@@ -196,9 +196,12 @@ $('tiles').innerHTML = [
   {label:'Day P&L', v: sign$(s.day_pnl), c: cls(s.day_pnl)},
   {label:'Realized P&L', v: sign$(s.realized_pnl), c: cls(s.realized_pnl)},
   {label:'Premium collected', v: fmt$(s.premium_collected), c: ''},
+  {label:'Win rate', v: s.closed_count ? Math.round(s.wins / s.closed_count * 100) +
+    '%' : '—', c: '', n: s.closed_count ? `${s.wins}/${s.closed_count} closed` : 'no closes yet'},
   {label:'Open spreads', v: s.open_count, c: ''},
+  {label:'Committee debates', v: s.debates, c: ''},
 ].map(t => `<div class="tile"><div class="label">${t.label}</div>
-  <div class="value ${t.c}">${t.v}</div></div>`).join('');
+  <div class="value ${t.c}">${t.v}</div>${t.n ? `<div class="note">${t.n}</div>` : ''}</div>`).join('');
 
 /* ---- equity line chart (single series, crosshair + tooltip) ---- */
 (function equityChart() {
@@ -229,7 +232,7 @@ $('tiles').innerHTML = [
   for (const i of [0, Math.floor((pts.length - 1) / 2), pts.length - 1]) {
     const label = new Date(xs[i]).toLocaleString('en-US', {month:'short',
       day:'numeric', timeZone:'America/New_York'});
-    const px = X(xs[i]);
+    const px = Math.min(Math.max(X(xs[i]), 30), W - m.r - 30);
     if (seen.some(s => s.label === label || Math.abs(s.px - px) < 70)) continue;
     seen.push({label, px});
     xlab.push(`<text x="${px}" y="${H - 6}" text-anchor="middle">${label}</text>`);
@@ -238,6 +241,23 @@ $('tiles').innerHTML = [
   const path = pts.map((p, i) =>
     `${i ? 'L' : 'M'}${X(xs[i]).toFixed(1)},${Y(ys[i]).toFixed(1)}`).join('');
   const last = pts.length - 1;
+
+  // Trade markers pinned to the curve: hollow = opened, filled = closed.
+  const eqAt = t => {
+    if (t <= xs[0]) return ys[0];
+    for (let i = 1; i < xs.length; i++) if (t <= xs[i]) {
+      const f = (t - xs[i - 1]) / (xs[i] - xs[i - 1] || 1);
+      return ys[i - 1] + f * (ys[i] - ys[i - 1]);
+    }
+    return ys[last];
+  };
+  const marks = (D.markers || []).map((mk, i) => {
+    const t = Math.min(Math.max(new Date(mk.ts).getTime(), x0), x1);
+    const fill = mk.type === 'open' ? 'var(--surface)' : 'var(--series)';
+    return `<circle class="mk" data-i="${i}" cx="${X(t).toFixed(1)}"
+      cy="${Y(eqAt(t)).toFixed(1)}" r="5" fill="${fill}"
+      stroke="var(--series)" stroke-width="2" style="cursor:pointer"/>`;
+  }).join('');
 
   box.insertAdjacentHTML('beforeend', `
   <svg viewBox="0 0 ${W} ${H}" width="100%" role="img"
@@ -253,12 +273,32 @@ $('tiles').innerHTML = [
           stroke="var(--axis)" stroke-width="1" style="display:none"/>
     <circle id="eq-dot" r="4.5" fill="var(--series)" stroke="var(--surface)"
             stroke-width="2" style="display:none"/>
+    ${marks}
     ${ylab.join('')}${xlab.join('')}
   </svg>`);
 
   const svg = box.querySelector('svg'), tip = $('eq-tip'),
         cross = $('eq-cross'), dot = $('eq-dot');
+  let tipLock = false;
+  svg.querySelectorAll('.mk').forEach(el => {
+    const mk = D.markers[+el.dataset.i];
+    el.addEventListener('mouseenter', () => {
+      tipLock = true;
+      cross.style.display = dot.style.display = 'none';
+      tip.style.display = 'block';
+      tip.innerHTML = `<div>${shortTs(mk.ts)}</div><div class="t-val">${esc(mk.label)}</div>`;
+      const r = svg.getBoundingClientRect(), bx = box.getBoundingClientRect();
+      let lx = +el.getAttribute('cx') * r.width / W + 12;
+      if (lx + tip.offsetWidth > bx.width - 8) lx -= tip.offsetWidth + 24;
+      tip.style.left = lx + 'px';
+      tip.style.top = (+el.getAttribute('cy') * r.height / H - 14) + 'px';
+    });
+    el.addEventListener('mouseleave', () => {
+      tipLock = false; tip.style.display = 'none';
+    });
+  });
   svg.addEventListener('mousemove', ev => {
+    if (tipLock) return;
     const r = svg.getBoundingClientRect();
     const mx = (ev.clientX - r.left) * W / r.width;
     let best = 0, bd = Infinity;
