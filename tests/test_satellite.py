@@ -11,6 +11,17 @@ from theta_shepherd.strategy import DebitCandidate, find_satellite_candidate
 from conftest import FakeOrder, FakeTradingClient, make_quote
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def far_horizon(monkeypatch):
+    """Keep candidate-construction tests date-stable: pretend the contest
+    horizon is far away regardless of when the suite runs."""
+    import theta_shepherd.strategy as strategy
+    monkeypatch.setattr(strategy, "effective_max_dte", lambda today=None: 5)
+
+
 class FakeMD:
     def __init__(self, price, quotes):
         self.price, self.quotes = price, quotes
@@ -82,7 +93,8 @@ def test_satellite_gates_one_at_a_time():
 
 
 def test_satellite_gates_budget_cap():
-    vio = satellite_gates(healthy(), make_debit(debit=2.0), qty=11, has_satellite=False)
+    over = int(settings.satellite_max_risk // 200) + 1  # one lot past the budget
+    vio = satellite_gates(healthy(), make_debit(debit=2.0), qty=over, has_satellite=False)
     assert any("satellite_risk_cap" in v for v in vio)
 
 

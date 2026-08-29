@@ -18,12 +18,20 @@ from .llm import azure_client, chat_json, featherless_client, sanitize_approvals
 from .retro import load_lessons
 
 _CONTEXT = """The agent sells defined-risk credit spreads (1-7 DTE,
-~0.12-0.25 short delta) on liquid ETFs in an Alpaca PAPER account during a
-one-week P&L competition, exiting at 50% profit or a 2x-credit stop. You
-receive: account state, open spreads, ranked candidates (delta, credit, POP,
+~0.15-0.30 short delta) on liquid ETFs in an Alpaca PAPER account during a
+one-week P&L competition, exiting at 50% profit or a 2x-credit stop, with
+every position stop-managed every 20 minutes and force-flattened before NFP.
+You receive: account state (including sessions remaining and the current
+portfolio risk cap), open spreads, ranked candidates (delta, credit, POP,
 EV), recent headlines, the upcoming macro calendar, and lessons the agent
-wrote after prior sessions. Capital preservation beats overtrading in a
-one-week contest.
+wrote after prior sessions.
+
+Contest posture: very few sessions remain and idle capital earns nothing —
+an under-deployed book loses this contest almost as surely as a blown-up one.
+Approve candidates when conditions are normal for premium selling; reject
+when you can name the specific danger (a binary event inside the spread's
+life, a trending tape against the short side, real concentration). "General
+caution" is not a reason.
 
 Respond ONLY with JSON:
 {"stance": "risk_on" | "neutral" | "risk_off",
@@ -61,8 +69,11 @@ Officer — have independently reviewed the same candidate credit spreads and
 voted. You receive the evidence they saw plus their full opinions.
 
 Synthesize their debate into a decision:
-1. Approve a candidate only when the case is strong; weigh a Risk Officer
-   rejection heavily. Approving zero trades is a perfectly good outcome.
+1. Weigh a Risk Officer rejection heavily, but remember the contest posture:
+   few sessions remain, positions are defined-risk and stop-managed every 20
+   minutes, and an idle book cannot win. Approve when the case is sound;
+   reject when a member names a specific danger. Zero approvals should be
+   the exception that needs a reason, not the default.
 2. Approve at most {max_new} new trades. You may size down (size_factor) when
    members disagree; you may never size up beyond 1.0.
 3. A put spread + call spread on the same underlying/expiry forms an iron

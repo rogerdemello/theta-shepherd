@@ -53,6 +53,17 @@ def must_flatten(now: datetime | None = None) -> bool:
     return now >= FLATTEN_AT
 
 
+def sessions_remaining(now: datetime | None = None) -> int:
+    """Trading sessions left before the mandatory flatten (inclusive of a
+    session currently underway)."""
+    now = now or now_et()
+    session_days = [datetime(2026, 8, 31, tzinfo=ET), datetime(2026, 9, 1, tzinfo=ET),
+                    datetime(2026, 9, 2, tzinfo=ET), datetime(2026, 9, 3, tzinfo=ET)]
+    if now >= FLATTEN_AT:
+        return 0
+    return sum(1 for d in session_days if d.date() >= now.date())
+
+
 def upcoming(now: datetime | None = None) -> list[str]:
     """Human-readable upcoming events, for the LLM context and journal."""
     now = now or now_et()

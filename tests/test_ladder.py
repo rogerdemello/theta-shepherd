@@ -46,6 +46,13 @@ def test_ladder_holds_after_red_day(monkeypatch):
     assert update_risk_ladder(state, 99_500.0) == settings.ladder_base_risk
 
 
+def test_ladder_rebases_when_config_base_raised(monkeypatch):
+    at_day(monkeypatch, 31)
+    stale = {"ladder": {"cap": settings.ladder_base_risk - 1_000.0,
+                        "date": "2026-08-31", "ref_equity": 100_000.0}}
+    assert update_risk_ladder(stale, 100_000.0) == settings.ladder_base_risk
+
+
 def test_ladder_never_exceeds_hard_ceiling(monkeypatch):
     at_day(monkeypatch, 31)
     state = {"ladder": {"cap": settings.max_portfolio_risk,

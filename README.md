@@ -68,7 +68,7 @@ flowchart TB
     NW --> committee
     CAL --> committee
     CHAIR -->|approve / veto / size down| RG
-    CHAIR -.->|unanimous direction only| SAT[Satellite sleeve<br/>≤$2k debit spread]
+    CHAIR -.->|unanimous direction only| SAT[Satellite sleeve<br/>≤$4k debit spread]
     SAT --> RG
     RG -->|only veto| EX --> ACCT
     EX --> J
@@ -84,7 +84,7 @@ flowchart TB
 | `theta_shepherd/committee.py` | The Trading Committee: Macro Analyst, Vol Trader, Risk Officer vote independently; the Chair synthesizes. Full debate journaled |
 | `theta_shepherd/retro.py` | Nightly retrospective: LLM distills the day's journal into `journal/lessons.md`, injected into the next day's committee prompts |
 | `theta_shepherd/llm.py` | Shared Azure OpenAI plumbing + single-gatekeeper fallback |
-| `theta_shepherd/risk.py` | Hard gates: per-trade risk cap, laddered portfolio risk cap ($4k base, +$2k per green day, $10k ceiling), daily loss limit, max open spreads |
+| `theta_shepherd/risk.py` | Hard gates: per-trade risk cap, laddered portfolio risk cap ($10k base, +$5k per green day, $25k ceiling), daily loss limit, max open spreads |
 | `theta_shepherd/econ_calendar.py` | Tier-1 macro calendar: entry blackouts around releases, mandatory pre-NFP flatten |
 | `theta_shepherd/execution.py` | Atomic MLEG limit orders (negative limit = credit) via `alpaca-py` |
 | `theta_shepherd/market.py` | Option chains with Greeks/IV, quotes, Benzinga news via Market Data API |
@@ -151,15 +151,17 @@ schtasks /create /tn "ThetaShepherd Retro" /tr "C:\path\to\scheduler_retro.bat" 
 ## Strategy in one paragraph
 
 Sell out-of-the-money vertical credit spreads (put side and call side; both sides on
-one expiry form an iron condor) on SPY/QQQ at 1–7 days to expiry, short strike in the
-0.12–0.25 delta band, $5 wide, only when the credit is ≥ 15% of width. Exit at 50% of
-max profit, stop out if the spread doubles against us, and never hold to same-day
-expiration. The committee decides *whether* and *which* — the risk gates decide *how
-much* and *whether it's allowed at all*.
+one expiry form an iron condor) on SPY/QQQ/IWM at 1–7 days to expiry, short strike in
+the 0.15–0.30 delta band ($5 wide, $3 on IWM), only when the credit is ≥ 15% of width
+— and **never expiring after the pre-NFP flatten**: premium that outlives the contest
+is premium paid back crossing the spread to exit. Exit at 50% of max profit, stop out
+if the spread doubles against us; expiry-day spreads ride the morning's accelerated
+decay and are hard-closed from 2 PM ET. The committee decides *whether* and *which* —
+the risk gates decide *how much* and *whether it's allowed at all*.
 
 One creative wrinkle: the **satellite sleeve**. When — and only when — all three
 committee personas independently call the same market direction, the agent may buy a
-single near-the-money debit spread (≤ $2k total risk, one at a time, +50% target /
+single near-the-money debit spread (≤ $4k total risk, one at a time, +50% target /
 −50% stop, never held into the last day). Unanimity among adversarial personas is
 rare by design; conviction is the scarce resource being spent.
 

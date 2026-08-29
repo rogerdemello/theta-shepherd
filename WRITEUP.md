@@ -15,9 +15,10 @@ strictly bounded downside, and daily compounding of small wins. Final result:
 ## AI logic — a committee, not a chatbot
 
 1. **Quantitative scout (deterministic).** Pulls option chains with Greeks/IV from
-   Alpaca's Market Data API, builds verticals with the short strike at 0.12–0.25
+   Alpaca's Market Data API, builds verticals with the short strike at 0.15–0.30
    |delta| ($5 wide; $3 on IWM) and credit ≥ 15% of width, ranked by EV per dollar
-   of risk.
+   of risk — and **never expiring after the contest's mandatory flatten**, so no
+   premium is sold that must be bought back early.
 2. **The Trading Committee.** Three personas review every candidate in *independent*
    model calls so they cannot anchor on each other: a **Macro Analyst** (calendar and
    event-gap risk), a **Vol Trader** (is the premium worth selling?), and a **Risk
@@ -26,7 +27,7 @@ strictly bounded downside, and daily compounding of small wins. Final result:
    explicitly good outcome. Every debate is journaled and replayable on the
    dashboard.
 3. **The satellite sleeve.** Only when all three personas independently call the same
-   market direction may the agent buy one directional debit spread (≤ $2,000 risk,
+   market direction may the agent buy one directional debit spread (≤ $4,000 risk,
    +50%/−50% exits, never held into its final day). Unanimity among adversarial
    personas is rare by design — conviction is the scarce resource being spent.
 4. **The shepherd learns.** After each close, a retrospective LLM reads the day's
@@ -39,15 +40,18 @@ The LLMs cannot invent trades, cannot exceed the scout's candidates, can only si
 
 ## Risk gates (hard-coded, no LLM can override)
 
-- **Per-trade cap:** worst-case loss ≤ $2,000; size derives from the cap, never conviction.
-- **Risk ladder:** portfolio cap starts at $4,000 and earns +$2,000 per *green day*
-  up to $10,000 — risk is a privilege the book pays for.
-- **Daily circuit breaker** (−$3,000 halts entries) · **5% drawdown kill switch**
-  (flattens everything) · max 6 spreads, 2 new per cycle.
+- **Per-trade cap:** worst-case loss ≤ $4,000; size derives from the cap, never conviction.
+- **Risk ladder:** portfolio cap starts at $10,000 and earns +$5,000 per *green day*
+  up to $25,000 — risk is a privilege the book pays for, and every position is
+  defined-risk and stop-checked every 20 minutes.
+- **Daily circuit breaker** (−$5,000 halts entries) · **5% drawdown kill switch**
+  (flattens everything) · max 12 spreads, 3 new per cycle.
 - **Econ-calendar guard:** entry blackouts around ISM/ADP/Claims releases, and a
   hard-coded **flatten-all at Sep 3, 3:30 PM ET** — the agent refuses to hold risk
   through nonfarm payrolls, which lands two hours before this contest's deadline.
-- **Mechanical exits:** +50% profit target, 2× credit stop, expiry-day force close.
+- **Mechanical exits:** +50% profit target, 2× credit stop; expiry-day spreads ride
+  the morning's accelerated theta and hard-close from 2 PM ET (never the
+  final-hours gamma).
 
 ## Alpaca infrastructure — all four pillars
 

@@ -152,6 +152,18 @@ def sync_with_broker(trading, state: dict) -> None:
         log_event("orphan_positions", {"positions": orphans})
 
 
+def should_force_close(dte: int, now_et=None) -> bool:
+    """Expiry-day spreads ride the morning's accelerated theta (profit target
+    and stop still run every cycle) but never the final-hours gamma: hard
+    close from force_close_et_hour onward. Anything past expiry closes now."""
+    if dte < settings.force_close_dte:
+        return True
+    if dte == settings.force_close_dte:
+        now = now_et or econ_calendar.now_et()
+        return now.hour >= settings.force_close_et_hour
+    return False
+
+
 def satellite_exit_reason(value: float | None, debit: float, dte: int) -> str | None:
     """Exit rule for the directional sleeve: take the win at 1.5x the debit,
     cut at half, never carry into the final day."""
@@ -191,7 +203,7 @@ def manage_exits(trading, md: MarketData, state: dict) -> None:
             reason = "profit_target"
         elif cost is not None and cost >= credit * settings.stop_loss_mult:
             reason = "stop_loss"
-        elif dte <= settings.force_close_dte:
+        elif should_force_close(dte):
             reason = "expiry_close"
 
         if reason:
@@ -249,6 +261,11 @@ def update_risk_ladder(state: dict, equity: float) -> float:
     cross local midnight). Returns the cap to use for this cycle."""
     today = econ_calendar.now_et().date().isoformat()
     ladder = state.get("ladder")
+    if ladder is not None and ladder["cap"] < settings.ladder_base_risk:
+        # Config raised the base after this ladder was persisted — the base
+        # is a floor, never a haircut on earned headroom.
+        ladder["cap"] = settings.ladder_base_risk
+        log_event("risk_ladder", {"action": "rebase", **ladder})
     if ladder is None:
         ladder = {"cap": settings.ladder_base_risk, "date": today, "ref_equity": equity}
         state["ladder"] = ladder
@@ -327,6 +344,8 @@ def run_cycle(force: bool = False) -> None:
 
     headlines = md.recent_headlines(settings.underlyings + ["SPX"])
     account_summary["upcoming_macro_events"] = econ_calendar.upcoming()
+    account_summary["sessions_remaining_before_mandatory_flatten"] = \
+        econ_calendar.sessions_remaining()
     decision = gate_decision(
         account_summary,
         [{k: s.get(k) for k in ("kind", "underlying", "short_symbol", "qty", "status")}

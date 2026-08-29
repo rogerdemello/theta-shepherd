@@ -79,6 +79,15 @@ During market days, run cycles every ~20–30 min (`--loop` or Task Scheduler �
 - **WRITEUP.md** fully refreshed (committee/satellite/ladder/learning + all 4 Alpaca pillars; 【】 for Thu numbers). **`social/submission_form.md`**: copy-paste form fields.
 - ⚠️ Gotcha learned: alpaca-mcp-server exposes destructive tools (`close_all_positions` etc.) — a name-heuristic demo script accidentally called it (all 4 legs rejected 422, market closed, zero harm; verified 0 open orders, positions intact). **Never pick MCP tools by heuristic; use exact read-only names.**
 
+## Done Sat Aug 29 block 4 ✅ — CONTEST MODE (user: "earn more than others")
+
+Research-backed P&L push (50%-manage-and-redeploy beats hold; expiry-day AM theta is the richest, PM gamma is the casino; 0.25–0.30Δ short-DTE still ~70% POP):
+- **Capital deployment up ~2.5x**: ladder $10k base +$5k/green → $25k ceiling; per-trade $4k; daily loss halt $5k; 12 spreads max, 3/cycle; delta band 0.15–0.30; satellite $4k. Persisted ladder auto-rebases (base is a floor).
+- **Contest-horizon expiry cap**: `effective_max_dte()` — nothing opened expiring after Sep 3 (the flatten). Existing Sep 4 condor is grandfathered; exits/flatten handle it.
+- **Expiry-day theta capture**: `should_force_close()` — dte==0 spreads ride until 14:00 ET (stops still every 20 min) instead of closing at open.
+- **Committee rebalanced for the contest**: prompts now say idle book ≈ losing book, veto needs a *named* danger; `sessions_remaining_before_mandatory_flatten` fed into evidence. Live smoke: committee approved the good SPY put spread 0.9-confidence full-size (previously vetoed everything) while still rejecting the weak call spread for concentration. **77 tests green.**
+- Docs synced (README/WRITEUP numbers). ⚠️ Risk posture now: worst-case book $25k+$4k satellite = 29% of account, mitigated by stops/kill switch/flatten — this was the user's explicit choice to chase P&L.
+
 ## Still TODO
 
 - ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.

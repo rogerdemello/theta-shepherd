@@ -78,6 +78,14 @@ class SpreadCandidate:
         }
 
 
+def effective_max_dte(today: date | None = None) -> int:
+    """Longest DTE we may open: never past the mandatory pre-NFP flatten.
+    Goes negative after the contest horizon — callers treat that as 'no
+    entries'."""
+    today = today or date.today()
+    return min(settings.max_dte, (settings.last_entry_expiry - today).days)
+
+
 @dataclass
 class DebitCandidate:
     """Satellite sleeve: a directional vertical debit spread. Bought only on a
@@ -128,14 +136,17 @@ def find_satellite_candidate(
 ) -> DebitCandidate | None:
     """Best available near-the-money vertical debit spread in the committee's
     direction, or None when nothing passes the cost filter."""
+    dte_hi = effective_max_dte()
+    if dte_hi < settings.satellite_min_dte:
+        return None  # contest horizon too close for a directional hold
     price = md.last_price(underlying)
     width = settings.width_for(underlying)
     if direction == "bullish":
         quotes = md.chain(underlying, ContractType.CALL, price * 0.97, price * 1.08,
-                          settings.satellite_min_dte, settings.max_dte)
+                          settings.satellite_min_dte, dte_hi)
     else:
         quotes = md.chain(underlying, ContractType.PUT, price * 0.92, price * 1.03,
-                          settings.satellite_min_dte, settings.max_dte)
+                          settings.satellite_min_dte, dte_hi)
 
     by_key = {(q.expiration, q.strike): q for q in quotes}
     best: DebitCandidate | None = None
@@ -189,11 +200,14 @@ def _pair_spreads(
 
 
 def find_candidates(md: MarketData, top_n: int = 8) -> list[SpreadCandidate]:
+    dte_hi = effective_max_dte()
+    if dte_hi < settings.min_dte:
+        return []  # past the contest horizon — nothing may be opened
     candidates: list[SpreadCandidate] = []
     for sym in settings.underlyings:
         price = md.last_price(sym)
-        puts = md.chain(sym, ContractType.PUT, price * 0.85, price, settings.min_dte, settings.max_dte)
-        calls = md.chain(sym, ContractType.CALL, price, price * 1.15, settings.min_dte, settings.max_dte)
+        puts = md.chain(sym, ContractType.PUT, price * 0.85, price, settings.min_dte, dte_hi)
+        calls = md.chain(sym, ContractType.CALL, price, price * 1.15, settings.min_dte, dte_hi)
         candidates += _pair_spreads(puts, "put_credit", price)
         candidates += _pair_spreads(calls, "call_credit", price)
 

@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -44,10 +45,14 @@ class Settings:
     underlyings: list[str] = field(default_factory=lambda: _env_list("UNDERLYINGS", ["SPY", "QQQ", "IWM"]))
 
     # Spread construction
-    min_dte: int = 1            # avoid same-day gamma risk
+    min_dte: int = 1            # avoid same-day gamma risk at entry
     max_dte: int = 7
-    short_delta_lo: float = 0.12   # |delta| band for the short strike
-    short_delta_hi: float = 0.25
+    # Contest horizon: never open anything expiring after the mandatory
+    # pre-NFP flatten — premium that outlives the contest is premium we pay
+    # to give back when we cross the spread to exit early.
+    last_entry_expiry: date = date(2026, 9, 3)
+    short_delta_lo: float = 0.15   # |delta| band for the short strike
+    short_delta_hi: float = 0.30   # richer credit; short-DTE still ~70% POP
     spread_width: float = 5.0      # dollars between strikes
     # Cheaper underlyings need narrower spreads to keep credit/width viable
     spread_width_overrides: dict[str, float] = field(default_factory=lambda: {"IWM": 3.0})
@@ -56,22 +61,25 @@ class Settings:
     def width_for(self, underlying: str) -> float:
         return self.spread_width_overrides.get(underlying.upper(), self.spread_width)
 
-    # Risk gates (dollars, per $100k account)
-    max_risk_per_trade: float = _env_float("MAX_RISK_PER_TRADE", 2_000.0)
-    max_portfolio_risk: float = _env_float("MAX_PORTFOLIO_RISK", 10_000.0)
+    # Risk gates (dollars, per $100k account) — contest posture: every spread
+    # is defined-risk and stop-managed every 20 min, so worst realized loss
+    # per spread runs well below max_loss; idle capital earns nothing in a
+    # one-week P&L contest.
+    max_risk_per_trade: float = _env_float("MAX_RISK_PER_TRADE", 4_000.0)
+    max_portfolio_risk: float = _env_float("MAX_PORTFOLIO_RISK", 25_000.0)
     # Risk ladder: portfolio cap starts at the base and earns +step per green
     # day, up to max_portfolio_risk. Risk is a privilege the book pays for.
-    ladder_base_risk: float = _env_float("LADDER_BASE_RISK", 4_000.0)
-    ladder_step: float = _env_float("LADDER_STEP", 2_000.0)
-    daily_loss_limit: float = _env_float("DAILY_LOSS_LIMIT", 3_000.0)
-    max_open_spreads: int = 6
-    max_new_trades_per_run: int = 2
+    ladder_base_risk: float = _env_float("LADDER_BASE_RISK", 10_000.0)
+    ladder_step: float = _env_float("LADDER_STEP", 5_000.0)
+    daily_loss_limit: float = _env_float("DAILY_LOSS_LIMIT", 5_000.0)
+    max_open_spreads: int = 12
+    max_new_trades_per_run: int = 3
     max_drawdown_frac: float = 0.05   # kill switch: flatten at 5% off peak equity
 
     # Satellite sleeve: at most ONE directional debit spread, opened only when
     # all three committee personas independently share the same non-neutral
     # directional view. Its risk budget is separate from the condor ladder.
-    satellite_max_risk: float = _env_float("SATELLITE_MAX_RISK", 2_000.0)
+    satellite_max_risk: float = _env_float("SATELLITE_MAX_RISK", 4_000.0)
     satellite_profit_mult: float = 1.5    # sell when value >= 1.5x debit paid
     satellite_stop_mult: float = 0.5      # cut when value <= 0.5x debit paid
     satellite_force_close_dte: int = 1    # never carry into the last day
@@ -82,7 +90,11 @@ class Settings:
     # Exits
     profit_target_frac: float = 0.50   # buy back at 50% of credit received
     stop_loss_mult: float = 2.0        # close if spread value reaches 2x credit
-    force_close_dte: int = 0           # close anything expiring today
+    force_close_dte: int = 0           # expiry-day handling below
+    # Expiry-day spreads ride the morning's accelerated decay (stops still
+    # checked every cycle) but never the final-hours gamma: hard close from
+    # this ET hour onward.
+    force_close_et_hour: int = 14
 
     # Journal
     journal_dir: Path = PROJECT_ROOT / "journal"
