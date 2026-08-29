@@ -55,6 +55,9 @@ TIMELINE_EVENTS = {
     "spread_closed", "close_submitted", "risk_veto", "entry_blackout",
     "flatten_all", "kill_switch", "halted", "retrospective", "risk_ladder",
     "spread_evicted", "orphan_positions",
+    "satellite_submitted", "satellite_filled", "satellite_abandoned",
+    "satellite_closed", "satellite_close_submitted", "satellite_veto",
+    "satellite_no_candidate",
 }
 
 
@@ -82,6 +85,18 @@ def _timeline_detail(e: dict) -> str:
         return f"{e.get('action')}: cap ${e.get('cap', 0):,.0f}"
     if k == "retrospective":
         return e.get("summary", "")[:160]
+    if k == "satellite_submitted":
+        return (f"{e.get('direction')} {e.get('underlying')} "
+                f"{e.get('buy_strike')}/{e.get('sell_strike')} x{e.get('qty')} "
+                f"@ {e.get('limit_debit')} debit")
+    if k == "satellite_filled":
+        return f"filled @ {e.get('filled_debit')} debit"
+    if k == "satellite_closed":
+        pnl = e.get("realized_pnl")
+        return f"sold @ {e.get('close_credit')} — P&L ${pnl:+,.0f}" \
+            if isinstance(pnl, (int, float)) else "closed"
+    if k == "satellite_veto":
+        return "; ".join(e.get("violations", []))
     return json.dumps({x: y for x, y in e.items() if x not in ("ts", "event")},
                       default=str)[:160]
 
@@ -109,7 +124,7 @@ def build_data() -> dict:
             premium += float(e.get("filled_credit", 0)) * 100 * qty
 
     realized = sum(float(e.get("realized_pnl", 0)) for e in events
-                   if e.get("event") == "spread_closed")
+                   if e.get("event") in ("spread_closed", "satellite_closed"))
 
     open_spreads = state.get("open_spreads", [])
     committed = sum(float(s.get("max_loss_total", 0)) for s in open_spreads
@@ -118,12 +133,18 @@ def build_data() -> dict:
     risk_cap = min(float(ladder.get("cap", settings.ladder_base_risk)),
                    settings.max_portfolio_risk)
 
+    def _strikes(s: dict) -> str:
+        if s.get("sleeve") == "satellite":
+            return f"{s.get('buy_strike')}/{s.get('sell_strike')}"
+        return f"{s.get('short_strike')}/{s.get('long_strike')}"
+
     flock = [{
         "symbol": s.get("short_symbol", ""), "kind": s.get("kind", ""),
         "underlying": s.get("underlying", ""), "qty": s.get("qty", 0),
-        "strikes": f"{s.get('short_strike')}/{s.get('long_strike')}",
+        "strikes": _strikes(s),
         "expiration": s.get("expiration", ""),
-        "credit": s.get("filled_credit", s.get("limit_credit")),
+        "credit": s.get("filled_credit", s.get("limit_credit",
+                        s.get("filled_debit", s.get("limit_debit")))),
         "max_loss": s.get("max_loss_total", 0), "status": s.get("status", ""),
     } for s in open_spreads]
 

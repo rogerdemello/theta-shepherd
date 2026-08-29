@@ -30,5 +30,15 @@ def snapshot_positions() -> str:
     return out
 
 
+def snapshot_options(symbols: list[str]) -> str:
+    """Greeks/IV spot-check on our own short legs, via the same CLI command an
+    operator would run — journaled so a human can audit the agent's marks."""
+    if not symbols:
+        return ""
+    out = _run(["data", "options", "snapshot", ",".join(symbols)])
+    log_event("cli_options_snapshot", {"symbols": symbols, "output": out})
+    return out
+
+
 def market_clock() -> str:
     return _run(["clock"])

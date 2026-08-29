@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from alpaca.trading.client import TradingClient
 
 from .config import settings
-from .strategy import SpreadCandidate
+from .strategy import DebitCandidate, SpreadCandidate
 
 
 @dataclass
@@ -60,4 +60,29 @@ def entry_gates(risk: AccountRisk, candidate: SpreadCandidate, qty: int,
         )
     if candidate.credit < settings.min_credit_frac * candidate.width:
         violations.append("min_credit: credit below floor at submission time")
+    return violations
+
+
+def size_satellite(candidate: DebitCandidate) -> int:
+    """Contracts such that the full debit stays inside the sleeve budget."""
+    if candidate.max_loss <= 0:
+        return 0
+    return max(0, int(settings.satellite_max_risk // candidate.max_loss))
+
+
+def satellite_gates(risk: AccountRisk, candidate: DebitCandidate, qty: int,
+                    has_satellite: bool) -> list[str]:
+    """Hard gates for the directional sleeve. Its budget is separate from the
+    condor ladder, but the daily loss circuit breaker still applies."""
+    violations = []
+    if qty < 1:
+        violations.append("size_zero: debit per lot exceeds the sleeve budget")
+    if has_satellite:
+        violations.append("satellite_exists: only one satellite at a time")
+    if risk.day_pnl <= -settings.daily_loss_limit:
+        violations.append(f"daily_loss_limit: day P&L {risk.day_pnl:.0f}")
+    if candidate.max_loss * qty > settings.satellite_max_risk:
+        violations.append("satellite_risk_cap: total debit above sleeve budget")
+    if candidate.debit > settings.satellite_max_debit_frac * candidate.width:
+        violations.append("satellite_debit_frac: paying too much of the width")
     return violations

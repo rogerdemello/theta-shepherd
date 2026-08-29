@@ -27,10 +27,13 @@ one-week contest.
 
 Respond ONLY with JSON:
 {"stance": "risk_on" | "neutral" | "risk_off",
+ "directional_view": "bullish" | "bearish" | "neutral",
  "votes": [{"index": <candidate index>, "vote": "approve" | "reject",
             "reason": "<one sentence>"}],
  "view": "<2-3 sentence assessment from your seat>"}
-Vote on EVERY candidate index you were given."""
+Vote on EVERY candidate index you were given. `directional_view` is your honest
+read on the broad market over the next 1-5 sessions — say "neutral" unless the
+evidence genuinely leans one way; a non-neutral call should be rare."""
 
 PERSONAS = {
     "macro_analyst": "You are the committee's MACRO ANALYST. You care about "
@@ -64,10 +67,17 @@ Synthesize their debate into a decision:
    members disagree; you may never size up beyond 1.0.
 3. A put spread + call spread on the same underlying/expiry forms an iron
    condor — fine when members see a range-bound market.
+4. Satellite: if — and only if — ALL THREE members gave the SAME non-neutral
+   directional_view, you MAY additionally propose one small directional debit
+   spread in that direction ("satellite"). This should be rare and requires an
+   exceptional case; omit the field otherwise. The engine independently
+   verifies the unanimity and caps the risk.
 
 Respond ONLY with JSON:
 {{"approved": [{{"index": <candidate index>, "confidence": 0-1,
    "size_factor": 0.25-1.0, "rationale": "<one sentence citing the debate>"}}],
+  "satellite": {{"underlying": "SPY" | "QQQ", "direction": "bullish" | "bearish",
+   "rationale": "<one sentence>"}},   // OPTIONAL — omit unless the case is exceptional
   "market_view": "<2-3 sentence synthesis>",
   "debate_summary": "<2-3 sentences: where members agreed/clashed and why the
    decision came out this way>"}}"""
@@ -106,8 +116,31 @@ class Committee:
         for a in decision["approved"]:
             a["unanimous"] = _is_unanimous(opinions, a["index"])
 
+        # Satellite survives only when the engine itself confirms all three
+        # personas called the same non-neutral direction — the chair's say-so
+        # is not enough.
+        unanimous_dir = unanimous_direction(opinions)
+        sat = decision.get("satellite")
+        if not (isinstance(sat, dict)
+                and unanimous_dir
+                and sat.get("direction") == unanimous_dir
+                and sat.get("underlying") in settings.underlyings):
+            decision.pop("satellite", None)
+        decision["unanimous_direction"] = unanimous_dir
+
         log_event("committee_debate", {"opinions": opinions, "decision": decision})
         return decision
+
+
+def unanimous_direction(opinions: dict[str, dict]) -> str | None:
+    """'bullish'/'bearish' when every persona gave that same non-neutral
+    directional_view; otherwise None."""
+    views = {op.get("directional_view") for op in opinions.values()}
+    if len(views) == 1:
+        view = views.pop()
+        if view in ("bullish", "bearish"):
+            return view
+    return None
 
 
 def _is_unanimous(opinions: dict[str, dict], index: int) -> bool:

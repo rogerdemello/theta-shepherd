@@ -56,6 +56,17 @@ class Settings:
     max_new_trades_per_run: int = 2
     max_drawdown_frac: float = 0.05   # kill switch: flatten at 5% off peak equity
 
+    # Satellite sleeve: at most ONE directional debit spread, opened only when
+    # all three committee personas independently share the same non-neutral
+    # directional view. Its risk budget is separate from the condor ladder.
+    satellite_max_risk: float = _env_float("SATELLITE_MAX_RISK", 2_000.0)
+    satellite_profit_mult: float = 1.5    # sell when value >= 1.5x debit paid
+    satellite_stop_mult: float = 0.5      # cut when value <= 0.5x debit paid
+    satellite_force_close_dte: int = 1    # never carry into the last day
+    satellite_min_dte: int = 2
+    satellite_delta_target: float = 0.55  # long leg: near-the-money
+    satellite_max_debit_frac: float = 0.60  # debit must be <= 60% of width
+
     # Exits
     profit_target_frac: float = 0.50   # buy back at 50% of credit received
     stop_loss_mult: float = 2.0        # close if spread value reaches 2x credit

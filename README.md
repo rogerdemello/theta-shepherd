@@ -31,9 +31,51 @@ writes lessons that change how the committee argues the next day.
        + nightly retrospective: journal → lessons.md → tomorrow's prompts
 ```
 
+```mermaid
+flowchart TB
+    subgraph data[Alpaca Market Data API]
+        CH[Option chains + Greeks/IV]
+        NW[Benzinga news]
+    end
+    subgraph engine[Quant engine]
+        SC[Scout: delta-targeted verticals<br/>EV-ranked, 1–7 DTE]
+        CAL[Econ calendar guard<br/>blackouts + pre-NFP flatten]
+    end
+    subgraph committee[AI Trading Committee — Azure OpenAI]
+        MA[Macro Analyst]
+        VT[Vol Trader]
+        RO[Risk Officer]
+        CHAIR[Chair — synthesizes votes]
+        MA --> CHAIR
+        VT --> CHAIR
+        RO --> CHAIR
+    end
+    RG[Hard risk gates — pure Python<br/>per-trade cap · risk ladder · daily stop · kill switch]
+    EX[Atomic MLEG orders<br/>Alpaca Trading API]
+    J[(Decision journal<br/>JSONL)]
+    RETRO[Nightly retrospective LLM]
+    LESS[lessons.md]
+    CLI[alpaca-cli snapshots]
+    MCP[Alpaca MCP server<br/>human overseer via Claude]
+    ACCT[(Paper account)]
+
+    CH --> SC --> CHAIR
+    NW --> committee
+    CAL --> committee
+    CHAIR -->|approve / veto / size down| RG
+    CHAIR -.->|unanimous direction only| SAT[Satellite sleeve<br/>≤$2k debit spread]
+    SAT --> RG
+    RG -->|only veto| EX --> ACCT
+    EX --> J
+    committee --> J
+    J --> RETRO --> LESS -->|injected into prompts| committee
+    CLI --> J
+    ACCT <--> MCP
+```
+
 | Module | Role |
 |---|---|
-| `theta_shepherd/strategy.py` | Builds 1–7 DTE vertical credit spreads, short strike at 0.12–0.25 delta, ranks by EV per dollar of risk |
+| `theta_shepherd/strategy.py` | Builds 1–7 DTE vertical credit spreads (short strike at 0.12–0.25 delta, EV-ranked) and the satellite sleeve's directional debit spreads |
 | `theta_shepherd/committee.py` | The Trading Committee: Macro Analyst, Vol Trader, Risk Officer vote independently; the Chair synthesizes. Full debate journaled |
 | `theta_shepherd/retro.py` | Nightly retrospective: LLM distills the day's journal into `journal/lessons.md`, injected into the next day's committee prompts |
 | `theta_shepherd/llm.py` | Shared Azure OpenAI plumbing + single-gatekeeper fallback |
@@ -107,8 +149,14 @@ Sell out-of-the-money vertical credit spreads (put side and call side; both side
 one expiry form an iron condor) on SPY/QQQ at 1–7 days to expiry, short strike in the
 0.12–0.25 delta band, $5 wide, only when the credit is ≥ 15% of width. Exit at 50% of
 max profit, stop out if the spread doubles against us, and never hold to same-day
-expiration. The LLM decides *whether* and *which* — the risk gates decide *how much*
-and *whether it's allowed at all*.
+expiration. The committee decides *whether* and *which* — the risk gates decide *how
+much* and *whether it's allowed at all*.
+
+One creative wrinkle: the **satellite sleeve**. When — and only when — all three
+committee personas independently call the same market direction, the agent may buy a
+single near-the-money debit spread (≤ $2k total risk, one at a time, +50% target /
+−50% stop, never held into the last day). Unanimity among adversarial personas is
+rare by design; conviction is the scarce resource being spent.
 
 ## Journal
 

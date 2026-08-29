@@ -13,17 +13,20 @@ from . import cli_ops, econ_calendar
 from .committee import Committee
 from .config import settings
 from .execution import (
+    close_satellite,
     close_spread,
     make_trading_client,
+    open_satellite,
     open_spread,
     resubmit_spread,
+    satellite_value,
     spread_close_cost,
 )
 from .journal import load_state, log_event, save_state
 from .llm import Gatekeeper
 from .market import MarketData, parse_occ
-from .risk import account_risk, entry_gates, size_trade
-from .strategy import find_candidates
+from .risk import account_risk, entry_gates, satellite_gates, size_satellite, size_trade
+from .strategy import find_candidates, find_satellite_candidate
 
 console = Console()
 
@@ -40,6 +43,40 @@ def _cancel_and_confirm_dead(trading, order_id: str):
     return trading.get_order_by_id(order_id)
 
 
+def _is_satellite(s: dict) -> bool:
+    return s.get("sleeve") == "satellite"
+
+
+def _adopt_fill(s: dict, avg_price) -> None:
+    """Mark a pending entry as open with its actual fill price."""
+    s["status"] = "open"
+    if _is_satellite(s):
+        s["filled_debit"] = abs(float(avg_price or s["limit_debit"]))
+        log_event("satellite_filled", {"client_order_id": s["client_order_id"],
+                                       "filled_debit": s["filled_debit"],
+                                       "qty": s["qty"],
+                                       "long_symbol": s["long_symbol"]})
+    else:
+        s["filled_credit"] = abs(float(avg_price or s["limit_credit"]))
+        log_event("entry_filled", {"client_order_id": s["client_order_id"],
+                                   "filled_credit": s["filled_credit"],
+                                   "qty": s["qty"],
+                                   "short_symbol": s["short_symbol"]})
+
+
+def _log_closed(s: dict, avg_price) -> None:
+    """Journal a filled exit with its realized P&L."""
+    px = abs(float(avg_price or 0))
+    if _is_satellite(s):
+        pnl = (px - s.get("filled_debit", s["limit_debit"])) * 100 * s["qty"]
+        log_event("satellite_closed", {"client_order_id": s["client_order_id"],
+                                       "close_credit": px, "realized_pnl": pnl})
+    else:
+        pnl = (s.get("filled_credit", s["limit_credit"]) - px) * 100 * s["qty"]
+        log_event("spread_closed", {"client_order_id": s["client_order_id"],
+                                    "close_debit": px, "realized_pnl": pnl})
+
+
 def reconcile(trading, state: dict) -> None:
     """Resolve pending entry/exit orders against their actual broker status."""
     remaining = []
@@ -49,12 +86,7 @@ def reconcile(trading, state: dict) -> None:
 
         if s["status"] == "pending_fill":
             if order.status == OrderStatus.FILLED:
-                s["status"] = "open"
-                s["filled_credit"] = abs(float(order.filled_avg_price or s["limit_credit"]))
-                log_event("entry_filled", {"client_order_id": s["client_order_id"],
-                                           "filled_credit": s["filled_credit"],
-                                           "qty": s["qty"],
-                                           "short_symbol": s["short_symbol"]})
+                _adopt_fill(s, order.filled_avg_price)
                 remaining.append(s)
             elif order.status in TERMINAL:
                 log_event("entry_dead", {"client_order_id": s["client_order_id"],
@@ -64,13 +96,14 @@ def reconcile(trading, state: dict) -> None:
                 # executable price rather than churning it.
                 final = _cancel_and_confirm_dead(trading, order_id)
                 if final.status == OrderStatus.FILLED:
-                    s["status"] = "open"
-                    s["filled_credit"] = abs(float(final.filled_avg_price or s["limit_credit"]))
-                    log_event("entry_filled", {"client_order_id": s["client_order_id"],
-                                               "filled_credit": s["filled_credit"],
-                                               "qty": s["qty"],
-                                               "short_symbol": s["short_symbol"]})
+                    _adopt_fill(s, final.filled_avg_price)
                     remaining.append(s)
+                    continue
+                if _is_satellite(s):
+                    # A directional trade that didn't fill at our price is not
+                    # chased — the edge was the price.
+                    log_event("satellite_abandoned",
+                              {"client_order_id": s["client_order_id"]})
                     continue
                 new_credit = round(s["limit_credit"] - REPRICE_STEP, 2)
                 floor = settings.min_credit_frac * s["width"]
@@ -82,18 +115,12 @@ def reconcile(trading, state: dict) -> None:
 
         elif s["status"] == "closing":
             if order.status == OrderStatus.FILLED:
-                debit = abs(float(order.filled_avg_price or 0))
-                pnl = (s.get("filled_credit", s["limit_credit"]) - debit) * 100 * s["qty"]
-                log_event("spread_closed", {"client_order_id": s["client_order_id"],
-                                            "close_debit": debit, "realized_pnl": pnl})
+                _log_closed(s, order.filled_avg_price)
             else:
                 final = _cancel_and_confirm_dead(trading, order_id) \
                     if order.status not in TERMINAL else order
                 if final.status == OrderStatus.FILLED:
-                    debit = abs(float(final.filled_avg_price or 0))
-                    pnl = (s.get("filled_credit", s["limit_credit"]) - debit) * 100 * s["qty"]
-                    log_event("spread_closed", {"client_order_id": s["client_order_id"],
-                                                "close_debit": debit, "realized_pnl": pnl})
+                    _log_closed(s, final.filled_avg_price)
                 else:
                     s["status"] = "open"  # retry the exit next pass with fresh quotes
                     s.pop("close_order_id", None)
@@ -125,14 +152,39 @@ def sync_with_broker(trading, state: dict) -> None:
         log_event("orphan_positions", {"positions": orphans})
 
 
+def satellite_exit_reason(value: float | None, debit: float, dte: int) -> str | None:
+    """Exit rule for the directional sleeve: take the win at 1.5x the debit,
+    cut at half, never carry into the final day."""
+    if value is not None and value >= debit * settings.satellite_profit_mult:
+        return "profit_target"
+    if value is not None and value <= debit * settings.satellite_stop_mult:
+        return "stop_loss"
+    if dte <= settings.satellite_force_close_dte:
+        return "expiry_close"
+    return None
+
+
 def manage_exits(trading, md: MarketData, state: dict) -> None:
     for s in state["open_spreads"]:
         if s["status"] != "open":
             continue
-        credit = s.get("filled_credit", s["limit_credit"])
-        cost = spread_close_cost(md, s)
         _, exp, _, _ = parse_occ(s["short_symbol"])
         dte = (exp - date.today()).days
+
+        if _is_satellite(s):
+            value = satellite_value(md, s)
+            debit = s.get("filled_debit", s["limit_debit"])
+            reason = satellite_exit_reason(value, debit, dte)
+            if reason:
+                s["close_order_id"] = close_satellite(
+                    trading, s, reason, value if value is not None else debit)
+                s["status"] = "closing"
+                console.print(f"[yellow]Satellite exit ({reason}):[/] "
+                              f"{s['long_symbol']} value={value}")
+            continue
+
+        credit = s.get("filled_credit", s["limit_credit"])
+        cost = spread_close_cost(md, s)
 
         reason = None
         if cost is not None and cost <= credit * (1 - settings.profit_target_frac):
@@ -158,12 +210,20 @@ def flatten_all(trading, md: MarketData, state: dict, reason: str) -> None:
             _cancel_and_confirm_dead(trading, s["order_id"])
             log_event("entry_cancelled_flatten", {"client_order_id": s["client_order_id"]})
         elif s["status"] == "open":
-            cost = spread_close_cost(md, s)
-            fallback = s.get("filled_credit", s["limit_credit"])
-            s["close_order_id"] = close_spread(
-                trading, s, f"flatten:{reason}",
-                cost if cost is not None else fallback, pad=0.10,
-            )
+            if _is_satellite(s):
+                value = satellite_value(md, s)
+                fallback = s.get("filled_debit", s["limit_debit"])
+                s["close_order_id"] = close_satellite(
+                    trading, s, f"flatten:{reason}",
+                    value if value is not None else fallback, pad=0.10,
+                )
+            else:
+                cost = spread_close_cost(md, s)
+                fallback = s.get("filled_credit", s["limit_credit"])
+                s["close_order_id"] = close_spread(
+                    trading, s, f"flatten:{reason}",
+                    cost if cost is not None else fallback, pad=0.10,
+                )
             s["status"] = "closing"
             remaining.append(s)
         else:
@@ -238,6 +298,8 @@ def run_cycle(force: bool = False) -> None:
     log_event("cycle_start", account_summary)
     cli_ops.snapshot_account()
     cli_ops.snapshot_positions()
+    cli_ops.snapshot_options([s["short_symbol"] for s in state["open_spreads"]
+                              if s.get("status") == "open"][:6])
 
     # --- Hard guards, in priority order ---
     if econ_calendar.must_flatten():
@@ -293,8 +355,40 @@ def run_cycle(force: bool = False) -> None:
                       f"{cand.short.strike}/{cand.long.strike} x{qty} "
                       f"credit~{record['limit_credit']} | {approval.get('rationale', '')}")
 
+    maybe_open_satellite(trading, md, risk, state, decision)
+
     save_state(state)
     log_event("cycle_end", {"open_spreads": len(state["open_spreads"])})
+
+
+def maybe_open_satellite(trading, md: MarketData, risk, state: dict,
+                         decision: dict) -> None:
+    """Open the directional sleeve only when the committee proposed it AND all
+    three personas independently called the same direction (verified in
+    committee.py) AND the hard sleeve gates pass."""
+    sat = decision.get("satellite")
+    if not sat:
+        return
+    console.print(f"[bold cyan]Satellite proposed:[/] {sat.get('direction')} "
+                  f"{sat.get('underlying')} — {sat.get('rationale', '')}")
+    cand = find_satellite_candidate(md, sat["underlying"], sat["direction"])
+    if cand is None:
+        log_event("satellite_no_candidate", {"proposal": sat})
+        return
+    qty = size_satellite(cand)
+    has_sat = any(_is_satellite(s) for s in state["open_spreads"])
+    violations = satellite_gates(risk, cand, qty, has_sat)
+    if violations:
+        console.print(f"[red]Satellite veto:[/] {violations}")
+        log_event("satellite_veto", {"candidate": cand.describe(),
+                                     "violations": violations})
+        return
+    record = open_satellite(trading, cand, qty)
+    record["status"] = "pending_fill"
+    state["open_spreads"].append(record)
+    console.print(f"[green]Satellite opened:[/] {cand.kind} {cand.underlying} "
+                  f"{cand.buy.strike}/{cand.sell.strike} x{qty} "
+                  f"debit~{record['limit_debit']}")
 
 
 def run_flatten() -> None:

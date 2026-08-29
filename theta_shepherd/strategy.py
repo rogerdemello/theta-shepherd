@@ -78,6 +78,89 @@ class SpreadCandidate:
         }
 
 
+@dataclass
+class DebitCandidate:
+    """Satellite sleeve: a directional vertical debit spread. Bought only on a
+    unanimous committee direction; risk is the debit paid, nothing more."""
+
+    underlying: str
+    direction: str  # "bullish" | "bearish"
+    expiration: date
+    buy: OptionQuote    # near-the-money leg we purchase
+    sell: OptionQuote   # further-OTM leg we sell to cheapen it
+    debit: float        # executable per-share cost (buy ask - sell bid)
+    width: float
+    underlying_price: float
+
+    @property
+    def kind(self) -> str:
+        return "satellite_bull" if self.direction == "bullish" else "satellite_bear"
+
+    @property
+    def max_loss(self) -> float:
+        return self.debit * 100
+
+    @property
+    def max_gain(self) -> float:
+        return (self.width - self.debit) * 100
+
+    def describe(self) -> dict:
+        return {
+            "sleeve": "satellite",
+            "underlying": self.underlying,
+            "kind": self.kind,
+            "direction": self.direction,
+            "expiration": self.expiration.isoformat(),
+            "dte": self.buy.dte,
+            "buy_strike": self.buy.strike,
+            "sell_strike": self.sell.strike,
+            "buy_delta": round(self.buy.delta or 0, 3),
+            "debit_per_share": round(self.debit, 2),
+            "width": self.width,
+            "max_loss_per_lot": round(self.max_loss, 2),
+            "max_gain_per_lot": round(self.max_gain, 2),
+            "underlying_price": round(self.underlying_price, 2),
+        }
+
+
+def find_satellite_candidate(
+    md: MarketData, underlying: str, direction: str
+) -> DebitCandidate | None:
+    """Best available near-the-money vertical debit spread in the committee's
+    direction, or None when nothing passes the cost filter."""
+    price = md.last_price(underlying)
+    width = settings.spread_width
+    if direction == "bullish":
+        quotes = md.chain(underlying, ContractType.CALL, price * 0.97, price * 1.08,
+                          settings.satellite_min_dte, settings.max_dte)
+    else:
+        quotes = md.chain(underlying, ContractType.PUT, price * 0.92, price * 1.03,
+                          settings.satellite_min_dte, settings.max_dte)
+
+    by_key = {(q.expiration, q.strike): q for q in quotes}
+    best: DebitCandidate | None = None
+    for q in quotes:
+        d = q.delta
+        if d is None or not (0.40 <= abs(d) <= 0.65):
+            continue
+        sell_strike = q.strike + width if direction == "bullish" else q.strike - width
+        sell = by_key.get((q.expiration, sell_strike))
+        if sell is None:
+            continue
+        debit = q.ask - sell.bid
+        if debit <= 0 or debit > settings.satellite_max_debit_frac * width:
+            continue
+        cand = DebitCandidate(underlying=underlying, direction=direction,
+                              expiration=q.expiration, buy=q, sell=sell,
+                              debit=debit, width=width, underlying_price=price)
+        # Prefer the long leg nearest the delta target; tie-break on cheaper debit.
+        key = (abs(abs(d) - settings.satellite_delta_target), debit)
+        if best is None or key < (abs(abs(best.buy.delta or 0)
+                                      - settings.satellite_delta_target), best.debit):
+            best = cand
+    return best
+
+
 def _pair_spreads(
     quotes: list[OptionQuote], kind: str, price: float
 ) -> list[SpreadCandidate]:
