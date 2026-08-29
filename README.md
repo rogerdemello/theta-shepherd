@@ -133,7 +133,17 @@ claude mcp add alpaca --transport stdio -- uvx alpaca-mcp-server --env-file /pat
 .\.venv\Scripts\python.exe run_agent.py --loop     # continuous, one cycle / 30 min
 .\.venv\Scripts\python.exe run_agent.py --retro    # nightly: journal → lessons.md
 .\.venv\Scripts\python.exe run_agent.py --flatten  # close everything now
-python -m pytest tests/                            # 48 tests, no network needed
+.\.venv\Scripts\python.exe run_agent.py --preflight # 8-point go/no-go check
+.\.venv\Scripts\python.exe run_agent.py --health   # watchdog: self-heal a dead schedule
+python -m pytest tests/                            # 84 tests, no network needed
+```
+
+Ops safety: state writes are atomic with a `.bak` fallback, a cycle lockfile
+prevents overlapping runs from double-submitting, exit orders escalate their
+price pad until stops fill, and `touch STOP` in the repo root halts new
+entries (exits keep managing) — delete it to resume.
+
+```powershell
 ```
 
 To run unattended on Windows, register the two scheduled tasks (paths are in the

@@ -88,6 +88,13 @@ Research-backed P&L push (50%-manage-and-redeploy beats hold; expiry-day AM thet
 - **Committee rebalanced for the contest**: prompts now say idle book ≈ losing book, veto needs a *named* danger; `sessions_remaining_before_mandatory_flatten` fed into evidence. Live smoke: committee approved the good SPY put spread 0.9-confidence full-size (previously vetoed everything) while still rejecting the weak call spread for concentration. **77 tests green.**
 - Docs synced (README/WRITEUP numbers). ⚠️ Risk posture now: worst-case book $25k+$4k satellite = 29% of account, mitigated by stops/kill switch/flatten — this was the user's explicit choice to chase P&L.
 
+## Done Sat Aug 29 block 5 ✅ — enterprise hardening
+
+- Atomic state writes (+`.bak` fallback on corruption); cycle lockfile (15-min stale break); escalating exit pads (0.03→0.15 by retry, `close_attempts` tracked); **STOP file** in repo root = manual brake.
+- **`--preflight`** (8 checks, live run: all PASS / GO) and **`--health`** self-healing watchdog: third scheduled task "ThetaShepherd Health" (Mon–Fri 19:35 IST, every 30 min ×6h) runs a cycle itself if the 20-min schedule dies mid-session.
+- Nightly retro task now also regenerates the dashboard and pushes docs/ → Pages auto-updates.
+- **84 tests green.** Monday morning routine: just run `--preflight` before 19:00 IST.
+
 ## Still TODO
 
 - ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.
