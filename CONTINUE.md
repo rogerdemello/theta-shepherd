@@ -18,7 +18,11 @@ Equity **~$100,007** (+$7 total). Realized winner today: the 728/733 call spread
 - QQQ **704/699** put spread x2, exp Sep 4 — last leg of the original condor (grandfathered
   past the contest horizon; exits/flatten handle it)
 - QQQ **707/702** put spread x9, exp Sep 3 — opened 21:01
-- IWM **291/288** x16 @ ~0.51 — submitted 21:33, **resting/working**, reprice logic will chase it
+- IWM **291/288** x16 @ ~0.51, exp Sep 3 — filled 21:4x
+
+No open orders. Committed risk ~$8.6k against the $10k ladder rung, so the hard risk gate is
+now vetoing new candidates (`portfolio_risk_cap`) — working as designed; the ladder steps up
++$5k per green day toward the $25k ceiling.
 
 Day P/L swings ±$70 intraday on mark-to-market noise in short options — not a signal.
 
@@ -198,3 +202,7 @@ died with `0xC000013A`) plus `-AllowStartIfOnBatteries -DontStopIfGoingOnBatteri
   just means "never run yet"
 - A cycle killed mid-flight leaves `journal/cycle.lock`; the agent breaks it after 15 min, but
   delete it by hand to avoid skipping the next scheduled cycle
+- **Never let two scheduled tasks `>>` the same log file.** Cycle (:00/:20/:40) and Publish
+  (:10/:40) overlap at :40; the loser of the concurrent append dies with **exit 1 and no output
+  whatsoever**, which reads like a phantom failure. Each task now writes
+  `journal/scheduler_<task>.log`. Verified by triggering both at once: Cycle=0, Publish=0.
