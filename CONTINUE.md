@@ -11,13 +11,16 @@
 - Repo (public): **https://github.com/rogerdemello/theta-shepherd** (MIT, main branch)
 - Alpaca paper account: **PA31OBPWA7MW** (fresh, $100k start, options Level 3) — this ID goes in the submission form
 
-## Live state (as of Fri Aug 28 ~23:00 IST)
+## Live state (as of Mon Aug 31 ~21:40 IST, session 1 in progress)
 
-**Open position:** QQQ iron condor, exp **Sep 4 2026**, 2 lots each side, filled:
-- Call credit spread 728/733 @ $1.01 credit ($202 collected)
-- Put credit spread 704/699 @ $0.76 credit ($152 collected, filled after auto-reprice)
-- Total premium $354, worst case ~$1,646. Equity ~$99,984 (entry mark noise, normal).
-- ⚠️ `journal/state.json` may still show the put as `pending_fill` — the next cycle's `reconcile()` will flip it to `open` automatically (it filled after the last cycle ran).
+Equity **~$100,007** (+$7 total). Realized winner today: the 728/733 call spread closed at the
+50% profit target. Open book:
+- QQQ **704/699** put spread x2, exp Sep 4 — last leg of the original condor (grandfathered
+  past the contest horizon; exits/flatten handle it)
+- QQQ **707/702** put spread x9, exp Sep 3 — opened 21:01
+- IWM **291/288** x16 @ ~0.51 — submitted 21:33, **resting/working**, reprice logic will chase it
+
+Day P/L swings ±$70 intraday on mark-to-market noise in short options — not a signal.
 
 **Exits are mechanical:** buy back at 50% of credit, stop at 2× credit, force-close at expiry day. Hard-coded **flatten-all at Sep 3, 3:30 PM ET** (NFP lands 8:30 AM ET Sep 4, 2h before the deadline — book must be flat and the equity curve frozen green).
 
@@ -109,6 +112,31 @@ New `--dry-run` mode (full pipeline rehearsal, zero side effects — verified by
 
 4th scheduled task "ThetaShepherd Publish" (Mon–Fri 19:40 IST, every 30 min ×6h): regenerates dashboard + pushes docs/ → the Pages URL is near-live during sessions without any server. Preflight now checks all 4 tasks (GO ✓). Architecture framing documented in README (headless scheduled backend + generated static frontend = 100% demo uptime).
 
+## Done Mon Aug 31 ✅ — session 1 live, scheduler rescued
+
+**The autonomous system was dead for the first 2 hours of the session and preflight said GO.**
+Two independent faults, both now fixed:
+
+1. **Unquoted action path.** `schtasks /TR "E:\Alapaca hackathon\scheduler_cycle.bat"` stored the
+   path unquoted, so Windows tried to launch `E:\Alapaca` → `0x80070002` every 20 min from 19:00.
+2. **Battery gate.** `DisallowStartIfOnBatteries=true` (the schtasks default) left every task
+   `Queued` forever — this is a laptop and it was unplugged at 39%.
+
+Fix: all four tasks re-registered via `Set-ScheduledTask` with `-Execute <bat path>` directly
+(a clean `<Command>` XML field — **no `cmd.exe /c` wrapper**, that reintroduces quoting hell and
+died with `0xC000013A`) plus `-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+-StartWhenAvailable`. Verified: Publish and Health both return `0` and do real work.
+
+- **Preflight hardened** (`_check_schtasks`): registration is not readiness. Now also verifies the
+  task is enabled, its target script exists, the space-bearing path survives unwrapping, and the
+  last run didn't fail to launch. **93 tests green** (+9 in `tests/test_preflight_tasks.py`).
+- Trading today: closed the QQQ 728/733 call spread at **50% profit target** (0.475 vs 1.01
+  credit); opened **QQQ 707/702 x9** @ ~0.84 and **IWM 291/288 x16** @ ~0.51 (committee chose
+  IWM explicitly to diversify away from QQQ concentration).
+- ⚠️ **Laptop must stay plugged in and awake during 19:00–01:30 IST.** The battery gate is off
+  now, but sleep/hibernate still stops the schedule dead. This is the single biggest operational
+  risk left for Tue/Wed.
+
 ## Still TODO
 
 - ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.
@@ -162,3 +190,11 @@ New `--dry-run` mode (full pipeline rehearsal, zero side effects — verified by
 - `journal.log_event` uses key `event` (not `kind` — candidate dicts carry their own `kind`)
 - `ContractType` imports from `alpaca.trading.enums`, not `alpaca.data.enums`
 - LLM correctly declines trades citing macro events — that's designed behavior, not a bug
+- **Scheduled tasks: never register with `schtasks /TR` when the path contains a space** — it
+  stores it unquoted and every run dies `0x80070002`. Use `Set-ScheduledTask -Execute <path>`.
+  Wrapping in `cmd.exe /c ""…""` is *not* the fix (dies `0xC000013A`); invoke the `.bat` directly.
+- A task stuck in state `Queued` that never runs = a conditions problem (battery/idle/network),
+  not a command problem. `schtasks /Query /XML` shows the real settings; `Last Result: 267011`
+  just means "never run yet"
+- A cycle killed mid-flight leaves `journal/cycle.lock`; the agent breaks it after 15 min, but
+  delete it by hand to avoid skipping the next scheduled cycle
