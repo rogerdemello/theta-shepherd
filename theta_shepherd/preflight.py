@@ -7,8 +7,11 @@ self-healing health watchdog during it.
 """
 
 import json
+import re
 import subprocess
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
@@ -67,15 +70,74 @@ def _check_stop_file() -> tuple[bool, str]:
             "no STOP file" if not STOP_FILE.exists() else f"STOP present: {STOP_FILE}")
 
 
+"""A task can be registered and still be incapable of running. On Mon Aug 31
+all four were registered (this check passed) yet none had ever executed: the
+paths were stored unquoted, so Windows tried to launch `E:\\Alapaca` and failed
+with 0x80070002 every 20 min, and DisallowStartIfOnBatteries left them Queued
+forever on an unplugged laptop. Registration is not readiness — verify the task
+can actually launch."""
+TASK_NS = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
+LAUNCH_FAILURE = {-2147024894, 2147942402}  # 0x80070002 — file not found
+
+
+def _task_xml(name: str):
+    """Task XML comes back UTF-16 from schtasks. None if not registered."""
+    proc = subprocess.run(["schtasks", "/query", "/tn", name, "/xml"],
+                          capture_output=True)
+    if proc.returncode != 0:
+        return None
+    for encoding in ("utf-16", "utf-8"):
+        try:
+            return ET.fromstring(proc.stdout.decode(encoding).lstrip("\ufeff"))
+        except (UnicodeError, ET.ParseError):
+            continue
+    return None
+
+
+def _launched_target(root) -> str:
+    """The script the action really invokes, unwrapped from any cmd.exe /c."""
+    command = (root.findtext(".//t:Exec/t:Command", "", TASK_NS) or "").strip()
+    args = (root.findtext(".//t:Exec/t:Arguments", "", TASK_NS) or "").strip()
+    if Path(command).name.lower() != "cmd.exe":
+        return command.strip('"')
+    quoted = re.findall(r'"([^"]+)"', args)
+    return (quoted[0] if quoted else args.removeprefix("/c").strip()).strip('"')
+
+
+def _last_result(name: str) -> int | None:
+    proc = subprocess.run(["schtasks", "/query", "/tn", name, "/fo", "list", "/v"],
+                          capture_output=True, text=True, errors="replace")
+    for line in proc.stdout.splitlines():
+        if line.startswith("Last Result:"):
+            try:
+                return int(line.split(":", 1)[1].strip())
+            except ValueError:
+                return None
+    return None
+
+
 def _check_schtasks() -> tuple[bool, str]:
-    missing = []
+    problems = []
     for name in SCHEDULED_TASKS:
-        proc = subprocess.run(["schtasks", "/query", "/tn", name],
-                              capture_output=True, text=True)
-        if proc.returncode != 0:
-            missing.append(name)
-    return (not missing,
-            "all scheduled tasks registered" if not missing else f"missing: {missing}")
+        root = _task_xml(name)
+        if root is None:
+            problems.append(f"{name}: not registered")
+            continue
+        settings_el = root.find("t:Settings", TASK_NS)
+        if settings_el is not None:
+            if (settings_el.findtext("t:DisallowStartIfOnBatteries", "", TASK_NS)
+                    or "").lower() == "true":
+                problems.append(f"{name}: won't start on battery")
+            if (settings_el.findtext("t:Enabled", "", TASK_NS) or "").lower() == "false":
+                problems.append(f"{name}: disabled")
+        target = _launched_target(root)
+        if target and not Path(target).exists():
+            problems.append(f"{name}: target missing ({target})")
+        if _last_result(name) in LAUNCH_FAILURE:
+            problems.append(f"{name}: last run failed to launch (0x80070002)")
+    return (not problems,
+            "all tasks registered and launchable" if not problems
+            else "; ".join(problems))
 
 
 CHECKS = [
