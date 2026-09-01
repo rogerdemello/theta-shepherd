@@ -141,6 +141,38 @@ died with `0xC000013A`) plus `-AllowStartIfOnBatteries -DontStopIfGoingOnBatteri
   now, but sleep/hibernate still stops the schedule dead. This is the single biggest operational
   risk left for Tue/Wed.
 
+## Done Tue Sep 1 ✅ — session 1 closed green, strategy corrected
+
+**Session 1 finished at +$506** (equity $100,506). The intraday "we're down" moment was a
+transient mark: overnight theta flipped all three spreads to +$404 unrealized. Scheduler ran
+unattended all night — Cycle/Health/Publish all `result=0`.
+
+Two substantive strategy defects found and fixed (see commit `333f617`):
+
+1. **EV modelled hold-to-expiry**, an outcome the agent never takes — it stops at 2× credit
+   first. Every candidate on the board scored negative (−26 to −69/lot), so the committee
+   reasoned against uniformly scary numbers and EV/risk ranking was biased toward low delta.
+   EV now models the real policy (win `profit_target_frac` of credit, lose
+   `stop_loss_mult − 1` credits, capped by true max loss). Break-even is **POP > 2/3**, i.e.
+   short delta < ~0.333 — which the 0.15–0.30 band satisfies.
+2. **Candidates with EV ≤ 0 are now dropped.** The credit floor never implied positive EV:
+   break-even needs `credit ≥ |delta| × width`, but `min_credit_frac` only asks 15% of width.
+3. **Directional balance gate** (`max_same_direction_spreads = 2`): the book had gone to 100%
+   put credit spreads — net long delta, every leg losing together on a selloff, which is
+   exactly what three down sessions delivered. Diversifying QQQ → IWM did nothing for this.
+   The gate never blocks the trade that would rebalance.
+
+Live effect: board went **8 candidates all-negative → 5 all-positive, call spreads taking the
+top three**. The nightly retro independently flagged the same concentration and EV problems.
+
+Also fixed (commit `c4f70c4`): the 01:45 retro exited 1, wrote no lessons, and reported "No
+journal events" — while that day's journal held 88 events. `run_retro()` returns `""` both for
+"nothing happened" and "model returned nothing", and the caller printed the benign message for
+both. Now retries once, distinguishes the cases, and exits 1 on real failure. Publish and Retro
+both commit+push within seconds; the loser's push was rejected, so both now rebase-and-retry.
+
+**99 tests green.**
+
 ## Still TODO
 
 - ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.
