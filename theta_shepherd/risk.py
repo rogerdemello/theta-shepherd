@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from alpaca.trading.client import TradingClient
 
 from .config import settings
+from .resilience import retry
 from .strategy import DebitCandidate, SpreadCandidate
 
 
@@ -19,7 +20,7 @@ class AccountRisk:
 
 
 def account_risk(trading: TradingClient, state: dict) -> AccountRisk:
-    acct = trading.get_account()
+    acct = retry(trading.get_account, what="get_account")
     equity = float(acct.equity)
     day_pnl = equity - float(acct.last_equity)
     spreads = state.get("open_spreads", [])

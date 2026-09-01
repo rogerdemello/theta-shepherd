@@ -16,6 +16,8 @@ from alpaca.data.requests import (
 from alpaca.trading.enums import ContractType
 
 from .config import settings
+from .econ_calendar import today_et
+from .resilience import retry
 
 _OCC_RE = re.compile(r"^([A-Z]+)(\d{6})([CP])(\d{8})$")
 
@@ -41,7 +43,8 @@ class OptionQuote:
 
     @property
     def dte(self) -> int:
-        return (self.expiration - date.today()).days
+        # ET, not local: see econ_calendar.today_et.
+        return (self.expiration - today_et()).days
 
 
 def parse_occ(symbol: str) -> tuple[str, date, str, float]:
@@ -62,7 +65,9 @@ class MarketData:
         self.news = NewsClient(key, secret)
 
     def last_price(self, symbol: str) -> float:
-        trades = self.stocks.get_stock_latest_trade(StockLatestTradeRequest(symbol_or_symbols=symbol))
+        trades = retry(self.stocks.get_stock_latest_trade,
+                       StockLatestTradeRequest(symbol_or_symbols=symbol),
+                       what=f"last_price:{symbol}")
         return float(trades[symbol].price)
 
     def chain(
@@ -74,7 +79,7 @@ class MarketData:
         dte_lo: int,
         dte_hi: int,
     ) -> list[OptionQuote]:
-        today = date.today()
+        today = today_et()
         req = OptionChainRequest(
             underlying_symbol=underlying,
             type=contract_type,
@@ -83,7 +88,8 @@ class MarketData:
             expiration_date_gte=today + timedelta(days=dte_lo),
             expiration_date_lte=today + timedelta(days=dte_hi),
         )
-        snapshots = self.options.get_option_chain(req)
+        snapshots = retry(self.options.get_option_chain, req,
+                          what=f"chain:{underlying}")
 
         quotes: list[OptionQuote] = []
         for sym, snap in snapshots.items():
@@ -111,8 +117,13 @@ class MarketData:
         return quotes
 
     def option_mids(self, symbols: list[str]) -> dict[str, float]:
-        """Latest mid price per option symbol (skips one-sided markets)."""
-        quotes = self.options.get_option_latest_quote(OptionLatestQuoteRequest(symbol_or_symbols=symbols))
+        """Latest mid price per option symbol (skips one-sided markets).
+
+        Retried: these marks drive every stop and profit target, so a blip
+        here is the difference between a managed book and an unmanaged one."""
+        quotes = retry(self.options.get_option_latest_quote,
+                       OptionLatestQuoteRequest(symbol_or_symbols=symbols),
+                       what="option_mids")
         mids = {}
         for sym, q in quotes.items():
             bid, ask = float(q.bid_price), float(q.ask_price)

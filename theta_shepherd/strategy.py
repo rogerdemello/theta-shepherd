@@ -12,6 +12,7 @@ from datetime import date
 from alpaca.trading.enums import ContractType
 
 from .config import settings
+from .econ_calendar import today_et
 from .market import MarketData, OptionQuote
 
 
@@ -92,7 +93,7 @@ def effective_max_dte(today: date | None = None) -> int:
     """Longest DTE we may open: never past the mandatory pre-NFP flatten.
     Goes negative after the contest horizon — callers treat that as 'no
     entries'."""
-    today = today or date.today()
+    today = today or today_et()
     return min(settings.max_dte, (settings.last_entry_expiry - today).days)
 
 
@@ -182,6 +183,17 @@ def find_satellite_candidate(
     return best
 
 
+def illiquid(q: OptionQuote) -> bool:
+    """A leg whose quote is too wide to exit through.
+
+    Entry credit is computed by crossing the spread, so a wide market is
+    already penalised at entry — but the exit crosses it a second time, and
+    the stop-loss rule assumes we can actually buy the short leg back near its
+    mark. A contract quoted 0.05 x 0.60 is defined risk on paper only."""
+    return (q.ask - q.bid) > max(settings.max_leg_quote_spread,
+                                 settings.max_leg_quote_spread_frac * q.mid)
+
+
 def _pair_spreads(
     quotes: list[OptionQuote], kind: str, price: float, width: float | None = None
 ) -> list[SpreadCandidate]:
@@ -195,6 +207,8 @@ def _pair_spreads(
         long_strike = q.strike - w if kind == "put_credit" else q.strike + w
         lng = by_key.get((q.expiration, long_strike))
         if lng is None:
+            continue
+        if illiquid(q) or illiquid(lng):
             continue
         credit = q.bid - lng.ask  # what we can actually collect crossing the spread
         if credit < settings.min_credit_frac * w:

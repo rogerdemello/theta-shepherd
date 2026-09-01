@@ -65,6 +65,13 @@ class Settings:
     # 15% floor filtered out the single most profitable bucket before the
     # committee ever saw it — leaving the agent trading the 0.25-0.30 shoulder.
     min_credit_frac: float = 0.08  # credit must be >= 8% of width
+    # Liquidity floor per leg: reject quotes wider than max(abs, frac x mid).
+    # The stop-loss rule assumes the short leg can be bought back near its
+    # mark; on a 0.05 x 0.60 market it cannot, and "defined risk" becomes
+    # theoretical. Deliberately permissive — normal SPY/QQQ/IWM 1-2 DTE
+    # markets at 0.20 delta quote a few cents wide and pass untouched.
+    max_leg_quote_spread: float = _env_float("MAX_LEG_QUOTE_SPREAD", 0.15)
+    max_leg_quote_spread_frac: float = _env_float("MAX_LEG_QUOTE_SPREAD_FRAC", 0.50)
     # A book of one direction only is a directional bet, not premium harvest:
     # don't stack more than this many same-kind spreads without the other side.
     max_same_direction_spreads: int = 2

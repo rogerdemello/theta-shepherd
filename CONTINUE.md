@@ -202,6 +202,61 @@ bound the downside: $5k daily loss limit, 5% drawdown kill switch, 2× credit st
 Dry run confirmed end-to-end: would open a SPY call spread to rebalance, directional gate
 vetoing two put spreads, exits all holding. **99 tests green.**
 
+## Done Tue Sep 1 (pre-open) ✅ — failure-mode hardening pass
+
+Audited every path where the agent could lose money or lose track of a position
+without anyone noticing until morning. **123 tests green** (+24 in
+`tests/test_hardening_session2.py`), preflight **9/9 GO**, dry run clean.
+
+1. **Timezone bug in every DTE calculation (silent, real P&L).** `date.today()`
+   on an IST machine is a day *ahead* of the market from 00:00–01:30 IST — the
+   last 90 minutes of every session. A spread expiring tomorrow read as
+   `dte=0`, so the expiry-day rule (force close from 14:00 ET) would have
+   liquidated the Sep-3 book on **Tue Sep 2 at 14:30 ET, a full day early**,
+   surrendering the richest day of theta; `effective_max_dte` hit 0 in the same
+   window and emptied the scout. New `econ_calendar.today_et()` is now the only
+   date DTE is measured against (`market.OptionQuote.dte`, `market.chain`,
+   `strategy.effective_max_dte`, exits, dry run, test fixtures).
+2. **Crash safety.** Every submitted order is persisted before the next API
+   call (`execute_approvals`, satellite, each exit, each flatten leg) and state
+   is saved right after `reconcile`. Previously an exception between two
+   submissions left a live order at the broker that state.json had never heard
+   of — no stop, no profit target, no flatten.
+3. **Fault containment.** `reconcile`, `manage_exits`, `flatten_all` and the
+   entry loop handle each spread independently: one unreadable order or
+   unquotable leg is journaled (`reconcile_error` / `exit_error` /
+   `flatten_error` / `entry_submit_error`) and the rest of the book still gets
+   managed. `cli_ops._run` now catches everything — it sits between the exit
+   engine and the hard guards, so an escape there would have skipped the
+   flatten and the kill switch.
+4. **Cancel races.** A cancel is a request, not an event. `_cancel_and_confirm_dead`
+   polls for a settled status; if the cancel never settles we do **not** reprice
+   (two spreads, one journal entry) and do **not** re-close (a second close
+   order that fills leaves us short the inverse). Journaled
+   `entry_cancel_unconfirmed` / `exit_cancel_unconfirmed`.
+5. **Eviction paranoia.** A single empty `get_all_positions()` read while state
+   tracks open spreads no longer deletes them — a blank/partial response and a
+   flat account are indistinguishable over one call, and an evicted spread is
+   one the agent will never close again. Needs two consecutive empty reads.
+6. **Directional gate integrity.** `risk.open_kinds` now updates *during* the
+   cycle, so three put spreads approved in one cycle no longer all pass the
+   gate that exists to stop exactly that.
+7. **Transient-failure retries** (`resilience.retry`, 3 attempts, exponential
+   backoff, journaled `api_retry`) on idempotent reads only — clock, account,
+   positions, orders, quotes, chains. Never on submit/cancel.
+8. **Stuck exits**: `exit_stuck` journaled after 5 failed close attempts, and
+   the flatten now escalates its pad like any other exit (being flat by the
+   deadline outranks the last cent).
+9. **Liquidity floor**: legs quoted wider than `max(0.15, 0.5 × mid)` are
+   dropped — the stop rule assumes the short leg can be bought back near its
+   mark. Measured on the live board: **0 of 381 legs rejected, 8 candidates
+   either way** — it costs nothing in normal markets and only bites in a
+   stressed tape.
+10. **Preflight check #9: power.** Sleep is the one failure the health watchdog
+    cannot heal (a sleeping laptop runs no task). Verifies idle sleep and
+    hibernate are disabled on AC; currently both 0 ✓. The residual risk is
+    still manual sleep / lid close / unplugging.
+
 ## Still TODO
 
 - ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.
@@ -250,6 +305,10 @@ vetoing two put spreads, exits all holding. **99 tests green.**
 
 ## Gotchas learned
 
+- **Never call `date.today()` in this codebase.** The machine is IST, the market
+  is ET, and local midnight lands at 14:30 ET — mid-session. Use
+  `econ_calendar.today_et()` / `now_et()` for anything dated, including test
+  fixtures.
 - Windows: set `$env:PYTHONIOENCODING='utf-8'` before running (CLI box-drawing chars vs cp1252); `cli_ops.py` already handles its own subprocess encoding
 - MLEG orders at mid often rest a few minutes — reprice logic handles it; don't panic-cancel
 - `journal.log_event` uses key `event` (not `kind` — candidate dicts carry their own `kind`)

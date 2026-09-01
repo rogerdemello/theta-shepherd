@@ -14,8 +14,11 @@ def _run(args: list[str]) -> str:
             encoding="utf-8", errors="replace", timeout=60,
         )
         return (proc.stdout or "").strip() or (proc.stderr or "").strip()
-    except (FileNotFoundError, subprocess.TimeoutExpired) as e:
-        return f"alpaca-cli unavailable: {e}"
+    except Exception as e:
+        # These snapshots are observability, not control flow — they run
+        # between the exit engine and the hard guards, so anything that
+        # escapes here would skip the flatten and the kill switch.
+        return f"alpaca-cli unavailable: {type(e).__name__}: {e}"
 
 
 def snapshot_account() -> str:

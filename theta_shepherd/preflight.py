@@ -70,6 +70,42 @@ def _check_stop_file() -> tuple[bool, str]:
             "no STOP file" if not STOP_FILE.exists() else f"STOP present: {STOP_FILE}")
 
 
+def _ac_sleep_settings(powercfg_output: str) -> dict[str, int]:
+    """Alias -> AC setting index, parsed from `powercfg /q SCHEME_CURRENT
+    SUB_SLEEP`. Values are seconds; 0 means never."""
+    values: dict[str, int] = {}
+    alias = None
+    for line in powercfg_output.splitlines():
+        line = line.strip()
+        if line.startswith("GUID Alias:"):
+            alias = line.split(":", 1)[1].strip()
+        elif line.startswith("Current AC Power Setting Index:") and alias:
+            try:
+                values[alias] = int(line.split(":", 1)[1].strip(), 16)
+            except ValueError:
+                pass
+    return values
+
+
+def _check_power() -> tuple[bool, str]:
+    """Sleep is the one failure the health watchdog cannot heal: a sleeping
+    laptop runs no scheduled task, so the agent stops managing live positions
+    while the market is open and nothing on the machine is awake to notice.
+    Idle sleep and hibernate must be disabled on AC for the session window."""
+    proc = subprocess.run(["powercfg", "/q", "SCHEME_CURRENT", "SUB_SLEEP"],
+                          capture_output=True, text=True, errors="replace")
+    if proc.returncode != 0:
+        return False, "powercfg unavailable — cannot verify the machine stays awake"
+    values = _ac_sleep_settings(proc.stdout)
+    awake = {k: values[k] for k in ("STANDBYIDLE", "HIBERNATEIDLE") if k in values}
+    asleep = {k: v for k, v in awake.items() if v}
+    if asleep:
+        fixes = " ".join(f"powercfg /change {'standby' if k == 'STANDBYIDLE' else 'hibernate'}"
+                         f"-timeout-ac 0" for k in asleep)
+        return False, f"machine sleeps on AC ({asleep}) — fix: {fixes}"
+    return True, f"no idle sleep/hibernate on AC ({awake or 'not reported'})"
+
+
 """A task can be registered and still be incapable of running. On Mon Aug 31
 all four were registered (this check passed) yet none had ever executed: the
 paths were stored unquoted, so Windows tried to launch `E:\\Alapaca` and failed
@@ -149,6 +185,7 @@ CHECKS = [
     ("journal", _check_journal),
     ("STOP file", _check_stop_file),
     ("scheduled tasks", _check_schtasks),
+    ("power (stays awake)", _check_power),
 ]
 
 

@@ -133,7 +133,7 @@ claude mcp add alpaca --transport stdio -- uvx alpaca-mcp-server --env-file /pat
 .\.venv\Scripts\python.exe run_agent.py --loop     # continuous, one cycle / 30 min
 .\.venv\Scripts\python.exe run_agent.py --retro    # nightly: journal → lessons.md
 .\.venv\Scripts\python.exe run_agent.py --flatten  # close everything now
-.\.venv\Scripts\python.exe run_agent.py --preflight # 8-point go/no-go check
+.\.venv\Scripts\python.exe run_agent.py --preflight # 9-point go/no-go check
 .\.venv\Scripts\python.exe run_agent.py --health   # watchdog: self-heal a dead schedule
 python -m pytest tests/                            # 84 tests, no network needed
 ```

@@ -2,8 +2,6 @@
 guards -> scout -> LLM gate -> risk gate -> execute. Designed to run one cycle
 per invocation (cron/Task Scheduler friendly) or continuously with --loop."""
 
-from datetime import date
-
 from alpaca.trading.enums import OrderStatus
 from rich.console import Console
 
@@ -28,6 +26,7 @@ from .execution import (
 from .journal import load_state, log_event, save_state
 from .llm import Gatekeeper
 from .market import MarketData, parse_occ
+from .resilience import retry
 from .risk import account_risk, entry_gates, satellite_gates, size_satellite, size_trade
 from .strategy import find_candidates, find_satellite_candidate
 
@@ -36,6 +35,14 @@ console = Console()
 TERMINAL = {OrderStatus.CANCELED, OrderStatus.EXPIRED, OrderStatus.REJECTED, OrderStatus.REPLACED}
 REPRICE_STEP = 0.03  # credit given up per reprice of an unfilled entry
 LOCK_MAX_AGE = 900   # a lock older than 15 min is from a dead process
+# A cancel is a request, not an event: the order can fill while it is in
+# flight. Poll for a terminal (or filled) status before acting on it.
+CANCEL_CONFIRM_TRIES = 4
+CANCEL_CONFIRM_DELAY = 0.4
+STUCK_EXIT_ATTEMPTS = 5   # an exit this reluctant needs a human to see it
+# Two consecutive empty position reads before evicting a tracked spread: one
+# empty read is as likely to be a bad response as an empty account.
+EVICTION_CONFIRMATIONS = 2
 
 # Manual emergency brake: `touch STOP` in the project root halts new entries
 # (exits and guards keep running); delete the file to resume.
@@ -61,12 +68,22 @@ def cycle_lock():
 
 
 def _cancel_and_confirm_dead(trading, order_id: str):
-    """Cancel an order and return its final state (it may have filled first)."""
+    """Cancel an order and return its settled state (it may have filled first).
+
+    Polls until the broker reports a terminal or filled status: a cancel that
+    has been *requested* is not a cancel that has *happened*, and acting on an
+    order still in flight is how one spread becomes two."""
     try:
         trading.cancel_order_by_id(order_id)
     except Exception:
         pass  # already terminal
-    return trading.get_order_by_id(order_id)
+    order = retry(trading.get_order_by_id, order_id, what="get_order_by_id")
+    for _ in range(CANCEL_CONFIRM_TRIES - 1):
+        if order.status == OrderStatus.FILLED or order.status in TERMINAL:
+            return order
+        time.sleep(CANCEL_CONFIRM_DELAY)
+        order = retry(trading.get_order_by_id, order_id, what="get_order_by_id")
+    return order
 
 
 def _is_satellite(s: dict) -> bool:
@@ -104,65 +121,123 @@ def _log_closed(s: dict, avg_price) -> None:
 
 
 def reconcile(trading, state: dict) -> None:
-    """Resolve pending entry/exit orders against their actual broker status."""
-    remaining = []
+    """Resolve pending entry/exit orders against their actual broker status.
+
+    Each spread is reconciled in isolation: one unreadable order (a transient
+    broker error, a bad id) must not abort the pass and leave the rest of the
+    book unexamined and unmanaged for the next 20 minutes."""
+    remaining: list[dict] = []
     for s in state["open_spreads"]:
-        order_id = s.get("close_order_id") or s["order_id"]
-        order = trading.get_order_by_id(order_id)
-
-        if s["status"] == "pending_fill":
-            if order.status == OrderStatus.FILLED:
-                _adopt_fill(s, order.filled_avg_price)
-                remaining.append(s)
-            elif order.status in TERMINAL:
-                log_event("entry_dead", {"client_order_id": s["client_order_id"],
-                                         "status": str(order.status)})
-            else:
-                # Unfilled from a previous cycle: work the order toward the
-                # executable price rather than churning it.
-                final = _cancel_and_confirm_dead(trading, order_id)
-                if final.status == OrderStatus.FILLED:
-                    _adopt_fill(s, final.filled_avg_price)
-                    remaining.append(s)
-                    continue
-                if _is_satellite(s):
-                    # A directional trade that didn't fill at our price is not
-                    # chased — the edge was the price.
-                    log_event("satellite_abandoned",
-                              {"client_order_id": s["client_order_id"]})
-                    continue
-                new_credit = round(s["limit_credit"] - REPRICE_STEP, 2)
-                floor = settings.min_credit_frac * s["width"]
-                if new_credit >= floor:
-                    remaining.append(resubmit_spread(trading, s, new_credit))
-                else:
-                    log_event("entry_abandoned", {"client_order_id": s["client_order_id"],
-                                                  "reason": "credit_floor"})
-
-        elif s["status"] == "closing":
-            if order.status == OrderStatus.FILLED:
-                _log_closed(s, order.filled_avg_price)
-            else:
-                final = _cancel_and_confirm_dead(trading, order_id) \
-                    if order.status not in TERMINAL else order
-                if final.status == OrderStatus.FILLED:
-                    _log_closed(s, final.filled_avg_price)
-                else:
-                    s["status"] = "open"  # retry the exit next pass with fresh quotes
-                    s["close_attempts"] = s.get("close_attempts", 0) + 1
-                    s.pop("close_order_id", None)
-                    remaining.append(s)
-        else:
-            remaining.append(s)
+        try:
+            _reconcile_one(trading, s, remaining)
+        except Exception:
+            log_event("reconcile_error", {"client_order_id": s.get("client_order_id"),
+                                          "traceback": traceback.format_exc()})
+            console.print(f"[red]Reconcile failed for {s.get('short_symbol')} "
+                          f"— keeping it tracked.[/]")
+            remaining.append(s)  # a live spread dropped from state is unmanaged
     state["open_spreads"] = remaining
+
+
+def _reconcile_one(trading, s: dict, remaining: list[dict]) -> None:
+    order_id = s.get("close_order_id") or s["order_id"]
+    order = retry(trading.get_order_by_id, order_id, what="get_order_by_id")
+
+    if s["status"] == "pending_fill":
+        if order.status == OrderStatus.FILLED:
+            _adopt_fill(s, order.filled_avg_price)
+            remaining.append(s)
+        elif order.status in TERMINAL:
+            log_event("entry_dead", {"client_order_id": s["client_order_id"],
+                                     "status": str(order.status)})
+        else:
+            # Unfilled from a previous cycle: work the order toward the
+            # executable price rather than churning it.
+            final = _cancel_and_confirm_dead(trading, order_id)
+            if final.status == OrderStatus.FILLED:
+                _adopt_fill(s, final.filled_avg_price)
+                remaining.append(s)
+                return
+            if final.status not in TERMINAL:
+                # The cancel never settled. Replacing the order now risks both
+                # of them filling — hold this one and retry next cycle.
+                log_event("entry_cancel_unconfirmed",
+                          {"client_order_id": s["client_order_id"],
+                           "status": str(final.status)})
+                remaining.append(s)
+                return
+            if _is_satellite(s):
+                # A directional trade that didn't fill at our price is not
+                # chased — the edge was the price.
+                log_event("satellite_abandoned",
+                          {"client_order_id": s["client_order_id"]})
+                return
+            new_credit = round(s["limit_credit"] - REPRICE_STEP, 2)
+            floor = settings.min_credit_frac * s["width"]
+            if new_credit >= floor:
+                remaining.append(resubmit_spread(trading, s, new_credit))
+            else:
+                log_event("entry_abandoned", {"client_order_id": s["client_order_id"],
+                                              "reason": "credit_floor"})
+
+    elif s["status"] == "closing":
+        if order.status == OrderStatus.FILLED:
+            _log_closed(s, order.filled_avg_price)
+        else:
+            final = _cancel_and_confirm_dead(trading, order_id) \
+                if order.status not in TERMINAL else order
+            if final.status == OrderStatus.FILLED:
+                _log_closed(s, final.filled_avg_price)
+            elif final.status not in TERMINAL:
+                # Same race, worse consequence: a second close order against a
+                # spread whose first close then fills leaves us short the
+                # inverse. Leave it closing and look again next cycle.
+                log_event("exit_cancel_unconfirmed",
+                          {"client_order_id": s["client_order_id"],
+                           "status": str(final.status)})
+                remaining.append(s)
+            else:
+                s["status"] = "open"  # retry the exit next pass with fresh quotes
+                s["close_attempts"] = s.get("close_attempts", 0) + 1
+                s.pop("close_order_id", None)
+                if s["close_attempts"] >= STUCK_EXIT_ATTEMPTS:
+                    log_event("exit_stuck", {"client_order_id": s["client_order_id"],
+                                             "short_symbol": s["short_symbol"],
+                                             "close_attempts": s["close_attempts"]})
+                    console.print(f"[bold red]Exit stuck ({s['close_attempts']} "
+                                  f"attempts):[/] {s['short_symbol']}")
+                remaining.append(s)
+    else:
+        remaining.append(s)
 
 
 def sync_with_broker(trading, state: dict) -> None:
     """State file vs broker positions: flag orphan legs and evict spreads whose
-    legs no longer exist at the broker (e.g. closed externally)."""
-    positions = {p.symbol: float(p.qty) for p in trading.get_all_positions()
+    legs no longer exist at the broker (e.g. closed externally).
+
+    Eviction is destructive — an evicted spread is one the agent will never
+    stop out or close again — so a positions read that comes back empty while
+    we still track open spreads must be corroborated by a second cycle before
+    it is believed. A partial/blank response and a flat account look
+    identical over one call."""
+    positions = {p.symbol: float(p.qty)
+                 for p in retry(trading.get_all_positions, what="get_all_positions")
                  if len(p.symbol) > 12}  # OCC symbols only
     tracked: set[str] = set()
+    open_tracked = [s for s in state["open_spreads"] if s["status"] == "open"]
+
+    if not positions and open_tracked:
+        state["empty_position_reads"] = state.get("empty_position_reads", 0) + 1
+        if state["empty_position_reads"] < EVICTION_CONFIRMATIONS:
+            log_event("position_read_suspect",
+                      {"tracked_open": len(open_tracked),
+                       "consecutive_empty_reads": state["empty_position_reads"]})
+            console.print("[yellow]Broker reports no option legs while state tracks "
+                          f"{len(open_tracked)} open — deferring eviction one cycle.[/]")
+            return
+    else:
+        state["empty_position_reads"] = 0
+
     kept = []
     for s in state["open_spreads"]:
         tracked.update((s["short_symbol"], s["long_symbol"]))
@@ -210,73 +285,111 @@ def satellite_exit_reason(value: float | None, debit: float, dte: int) -> str | 
 
 
 def manage_exits(trading, md: MarketData, state: dict) -> None:
+    """Exit rules for every open spread. Each is managed independently and the
+    state file is written as soon as an exit order exists: an unquotable leg
+    or a rejected order must not cost the rest of the book its stops, and a
+    close order the state file doesn't know about gets submitted twice."""
     for s in state["open_spreads"]:
-        if s["status"] != "open":
-            continue
-        _, exp, _, _ = parse_occ(s["short_symbol"])
-        dte = (exp - date.today()).days
+        try:
+            _manage_exit_one(trading, md, s)
+            if s["status"] == "closing":
+                save_state(state)
+        except Exception:
+            log_event("exit_error", {"client_order_id": s.get("client_order_id"),
+                                     "short_symbol": s.get("short_symbol"),
+                                     "traceback": traceback.format_exc()})
+            console.print(f"[red]Exit management failed for {s.get('short_symbol')}[/]")
 
-        if _is_satellite(s):
-            value = satellite_value(md, s)
-            debit = s.get("filled_debit", s["limit_debit"])
-            reason = satellite_exit_reason(value, debit, dte)
-            if reason:
-                s["close_order_id"] = close_satellite(
-                    trading, s, reason, value if value is not None else debit,
-                    pad=close_pad(s.get("close_attempts", 0)))
-                s["status"] = "closing"
-                console.print(f"[yellow]Satellite exit ({reason}):[/] "
-                              f"{s['long_symbol']} value={value}")
-            continue
 
-        credit = s.get("filled_credit", s["limit_credit"])
-        cost = spread_close_cost(md, s)
+def _manage_exit_one(trading, md: MarketData, s: dict) -> None:
+    if s["status"] != "open":
+        return
+    _, exp, _, _ = parse_occ(s["short_symbol"])
+    dte = (exp - econ_calendar.today_et()).days
 
-        reason = None
-        if cost is not None and cost <= credit * (1 - settings.profit_target_frac):
-            reason = "profit_target"
-        elif cost is not None and cost >= credit * settings.stop_loss_mult:
-            reason = "stop_loss"
-        elif should_force_close(dte):
-            reason = "expiry_close"
-
+    if _is_satellite(s):
+        value = satellite_value(md, s)
+        debit = s.get("filled_debit", s["limit_debit"])
+        reason = satellite_exit_reason(value, debit, dte)
         if reason:
-            s["close_order_id"] = close_spread(trading, s, reason,
-                                               cost if cost is not None else credit,
-                                               pad=close_pad(s.get("close_attempts", 0)))
+            s["close_order_id"] = close_satellite(
+                trading, s, reason, value if value is not None else debit,
+                pad=close_pad(s.get("close_attempts", 0)))
             s["status"] = "closing"
-            console.print(f"[yellow]Exit ({reason}):[/] {s['short_symbol']} cost={cost}")
+            console.print(f"[yellow]Satellite exit ({reason}):[/] "
+                          f"{s['long_symbol']} value={value}")
+        return
+
+    credit = s.get("filled_credit", s["limit_credit"])
+    cost = spread_close_cost(md, s)
+
+    reason = None
+    if cost is not None and cost <= credit * (1 - settings.profit_target_frac):
+        reason = "profit_target"
+    elif cost is not None and cost >= credit * settings.stop_loss_mult:
+        reason = "stop_loss"
+    elif should_force_close(dte):
+        reason = "expiry_close"
+
+    if reason:
+        s["close_order_id"] = close_spread(trading, s, reason,
+                                           cost if cost is not None else credit,
+                                           pad=close_pad(s.get("close_attempts", 0)))
+        s["status"] = "closing"
+        console.print(f"[yellow]Exit ({reason}):[/] {s['short_symbol']} cost={cost}")
 
 
 def flatten_all(trading, md: MarketData, state: dict, reason: str) -> None:
-    """Cancel pending entries and close every open spread aggressively."""
+    """Cancel pending entries and close every open spread aggressively.
+
+    This is the path that must never fail halfway: it runs on the drawdown
+    kill switch and at the mandatory pre-NFP flatten. One spread that throws
+    (unquotable leg, rejected order) is journaled and skipped so the rest of
+    the book still gets closed, and every submitted exit is persisted
+    immediately."""
     console.print(f"[bold red]FLATTEN ALL — {reason}[/]")
     log_event("flatten_all", {"reason": reason})
     remaining = []
+    failures = 0
     for s in state["open_spreads"]:
-        if s["status"] == "pending_fill":
-            _cancel_and_confirm_dead(trading, s["order_id"])
-            log_event("entry_cancelled_flatten", {"client_order_id": s["client_order_id"]})
-        elif s["status"] == "open":
-            if _is_satellite(s):
-                value = satellite_value(md, s)
-                fallback = s.get("filled_debit", s["limit_debit"])
-                s["close_order_id"] = close_satellite(
-                    trading, s, f"flatten:{reason}",
-                    value if value is not None else fallback, pad=0.10,
-                )
-            else:
-                cost = spread_close_cost(md, s)
-                fallback = s.get("filled_credit", s["limit_credit"])
-                s["close_order_id"] = close_spread(
-                    trading, s, f"flatten:{reason}",
-                    cost if cost is not None else fallback, pad=0.10,
-                )
-            s["status"] = "closing"
+        try:
+            if s["status"] == "pending_fill":
+                _cancel_and_confirm_dead(trading, s["order_id"])
+                log_event("entry_cancelled_flatten",
+                          {"client_order_id": s["client_order_id"]})
+                continue
+            if s["status"] == "open":
+                # A flatten that keeps failing pays up like any other stuck
+                # exit — being flat by the deadline outranks the last cent.
+                pad = max(0.10, close_pad(s.get("close_attempts", 0)))
+                if _is_satellite(s):
+                    value = satellite_value(md, s)
+                    fallback = s.get("filled_debit", s["limit_debit"])
+                    s["close_order_id"] = close_satellite(
+                        trading, s, f"flatten:{reason}",
+                        value if value is not None else fallback, pad=pad,
+                    )
+                else:
+                    cost = spread_close_cost(md, s)
+                    fallback = s.get("filled_credit", s["limit_credit"])
+                    s["close_order_id"] = close_spread(
+                        trading, s, f"flatten:{reason}",
+                        cost if cost is not None else fallback, pad=pad,
+                    )
+                s["status"] = "closing"
+                save_state(state)  # the close order id must survive a crash here
             remaining.append(s)
-        else:
-            remaining.append(s)
+        except Exception:
+            failures += 1
+            log_event("flatten_error", {"client_order_id": s.get("client_order_id"),
+                                        "short_symbol": s.get("short_symbol"),
+                                        "traceback": traceback.format_exc()})
+            console.print(f"[bold red]FLATTEN FAILED for {s.get('short_symbol')} "
+                          f"— retried next cycle.[/]")
+            remaining.append(s)  # still ours; next cycle tries again
     state["open_spreads"] = remaining
+    if failures:
+        log_event("flatten_incomplete", {"reason": reason, "failures": failures})
     save_state(state)
 
 
@@ -339,7 +452,7 @@ def _run_cycle(force: bool = False) -> None:
     trading = make_trading_client()
     md = MarketData()
 
-    clock = trading.get_clock()
+    clock = retry(trading.get_clock, what="get_clock")
     console.print(f"[bold]Theta Shepherd[/] | market {'OPEN' if clock.is_open else 'CLOSED'}")
     if not clock.is_open and not force:
         log_event("cycle_skipped", {"reason": "market_closed"})
@@ -347,6 +460,7 @@ def _run_cycle(force: bool = False) -> None:
 
     state = load_state()
     reconcile(trading, state)
+    save_state(state)  # adopted fills and repriced orders, before anything else can throw
     sync_with_broker(trading, state)
     manage_exits(trading, md, state)
     save_state(state)
@@ -405,6 +519,28 @@ def _run_cycle(force: bool = False) -> None:
     if decision.get("debate_summary"):
         console.print(f"[magenta]Debate:[/] {decision['debate_summary']}")
 
+    execute_approvals(trading, state, risk, candidates, decision, portfolio_cap)
+
+    try:
+        maybe_open_satellite(trading, md, risk, state, decision)
+    except Exception:
+        log_event("satellite_error", {"traceback": traceback.format_exc()})
+        console.print("[red]Satellite handling failed — core book unaffected.[/]")
+
+    save_state(state)
+    log_event("cycle_end", {"open_spreads": len(state["open_spreads"])})
+
+
+def execute_approvals(trading, state: dict, risk, candidates: list,
+                      decision: dict, portfolio_cap: float) -> int:
+    """Submit the committee's approvals through the hard gates. Returns the
+    number of orders that reached the broker.
+
+    Each approval is independent: a rejected submission skips to the next one,
+    and the running risk totals — including `open_kinds`, which the
+    directional-balance gate reads — are updated as we go, so the gates see
+    this cycle's own fills rather than a snapshot taken before it started."""
+    opened = 0
     for approval in decision["approved"]:
         cand = candidates[approval["index"]]
         qty = max(1, int(size_trade(cand) * approval["size_factor"])) if size_trade(cand) else 0
@@ -413,19 +549,26 @@ def _run_cycle(force: bool = False) -> None:
             console.print(f"[red]Risk gate veto:[/] {violations}")
             log_event("risk_veto", {"candidate": cand.describe(), "violations": violations})
             continue
-        record = open_spread(trading, cand, qty)
+        try:
+            record = open_spread(trading, cand, qty)
+        except Exception:
+            # A rejected or errored submission is not a reason to abandon the
+            # remaining approvals — or to lose the ones already live.
+            log_event("entry_submit_error", {"candidate": cand.describe(),
+                                             "traceback": traceback.format_exc()})
+            console.print(f"[red]Order submission failed:[/] {cand.underlying} {cand.kind}")
+            continue
         record["status"] = "pending_fill"
         state["open_spreads"].append(record)
+        save_state(state)  # an order at the broker that state doesn't know about is unmanaged
+        opened += 1
         risk.committed_risk += cand.max_loss * qty
         risk.open_spreads += 1
+        risk.open_kinds = risk.open_kinds + (cand.kind,)
         console.print(f"[green]Opened:[/] {cand.kind} {cand.underlying} "
                       f"{cand.short.strike}/{cand.long.strike} x{qty} "
                       f"credit~{record['limit_credit']} | {approval.get('rationale', '')}")
-
-    maybe_open_satellite(trading, md, risk, state, decision)
-
-    save_state(state)
-    log_event("cycle_end", {"open_spreads": len(state["open_spreads"])})
+    return opened
 
 
 def maybe_open_satellite(trading, md: MarketData, risk, state: dict,
@@ -453,6 +596,7 @@ def maybe_open_satellite(trading, md: MarketData, risk, state: dict,
     record = open_satellite(trading, cand, qty)
     record["status"] = "pending_fill"
     state["open_spreads"].append(record)
+    save_state(state)
     console.print(f"[green]Satellite opened:[/] {cand.kind} {cand.underlying} "
                   f"{cand.buy.strike}/{cand.sell.strike} x{qty} "
                   f"debit~{record['limit_debit']}")
@@ -481,7 +625,8 @@ def run_dry_run() -> None:
             console.print(f"   {s['client_order_id']}: [red]lookup failed[/] ({e})")
 
     console.print("[bold]2. Positions vs state[/]")
-    positions = {p.symbol: float(p.qty) for p in trading.get_all_positions()
+    positions = {p.symbol: float(p.qty)
+                 for p in retry(trading.get_all_positions, what="get_all_positions")
                  if len(p.symbol) > 12}
     tracked = {sym for s in state["open_spreads"]
                for sym in (s["short_symbol"], s["long_symbol"])}
@@ -494,7 +639,7 @@ def run_dry_run() -> None:
         if s["status"] not in ("open", "pending_fill"):
             continue
         _, exp, _, _ = parse_occ(s["short_symbol"])
-        dte = (exp - date.today()).days
+        dte = (exp - econ_calendar.today_et()).days
         if _is_satellite(s):
             mark = satellite_value(md, s)
             reason = satellite_exit_reason(mark, s.get("filled_debit", s["limit_debit"]), dte)

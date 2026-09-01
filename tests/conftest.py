@@ -1,10 +1,12 @@
 """Shared fixtures: journal isolation, quote/candidate builders, fake broker."""
 
-from datetime import date, timedelta
+from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
+from alpaca.trading.enums import OrderStatus
 
+from theta_shepherd.econ_calendar import today_et
 from theta_shepherd.market import OptionQuote
 from theta_shepherd.strategy import SpreadCandidate
 
@@ -21,7 +23,7 @@ def tmp_journal(tmp_path, monkeypatch):
 
 def make_quote(underlying="SPY", strike=630.0, cp="put", bid=0.95, ask=1.05,
                delta=-0.18, dte=4, iv=0.15) -> OptionQuote:
-    exp = date.today() + timedelta(days=dte)
+    exp = today_et() + timedelta(days=dte)  # quotes are dated in market time
     ymd = exp.strftime("%y%m%d")
     occ = f"{underlying}{ymd}{'P' if cp == 'put' else 'C'}{int(strike * 1000):08d}"
     return OptionQuote(symbol=occ, underlying=underlying, expiration=exp,
@@ -56,7 +58,13 @@ class FakeTradingClient:
         return self.orders[order_id]
 
     def cancel_order_by_id(self, order_id):
+        """A real cancel moves the order to a terminal state. The old fake left
+        it NEW forever, which made the cancel-confirmation path untestable and
+        hid the double-submit risk it now guards against."""
         self.cancelled.append(order_id)
+        order = self.orders.get(order_id)
+        if order is not None and order.status not in (OrderStatus.FILLED,):
+            order.status = OrderStatus.CANCELED
 
     def submit_order(self, order):
         self.submitted.append(order)

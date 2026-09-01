@@ -6,7 +6,7 @@ submission deadline) triggers a mandatory flatten the prior afternoon.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 ET = ZoneInfo("America/New_York")
@@ -37,6 +37,19 @@ FLATTEN_AT = datetime(2026, 9, 3, 15, 30, tzinfo=ET)
 
 def now_et() -> datetime:
     return datetime.now(ET)
+
+
+def today_et() -> date:
+    """The trading-calendar date — the only date DTE may ever be measured
+    against.
+
+    This agent runs on a machine in IST, where local midnight lands at 14:30
+    ET: mid-session. `date.today()` there is a day ahead of the market for the
+    last 90 minutes of every session, so a spread expiring tomorrow reads as
+    dte=0 and the expiry-day rule force-closes it a full day early — precisely
+    the day of theta the strategy is built to collect. The same skew emptied
+    the scout (effective_max_dte hit 0) in that window."""
+    return now_et().date()
 
 
 def entry_blackout(now: datetime | None = None) -> str | None:
