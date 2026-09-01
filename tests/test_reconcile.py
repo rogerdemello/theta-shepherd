@@ -3,6 +3,7 @@
 from alpaca.trading.enums import OrderStatus
 
 from theta_shepherd.agent import reconcile
+from theta_shepherd.config import settings
 
 from conftest import FakeOrder, FakeTradingClient
 
@@ -49,8 +50,12 @@ def test_stale_entry_is_repriced_one_step():
 def test_stale_entry_below_credit_floor_is_abandoned():
     trading = FakeTradingClient({"o1": FakeOrder(status=OrderStatus.NEW,
                                                  filled_avg_price=None)})
-    # floor = 0.15 * 5.0 = 0.75; 0.75 - 0.03 falls below it
-    state = {"open_spreads": [spread(limit_credit=0.75)]}
+    # Derive from the floor rather than hardcoding it: start exactly at the
+    # floor so the next REPRICE_STEP drops the entry under it. Pinning a
+    # literal credit here silently stopped testing abandonment when
+    # min_credit_frac was retuned.
+    floor = settings.min_credit_frac * 5.0
+    state = {"open_spreads": [spread(limit_credit=round(floor, 2))]}
     reconcile(trading, state)
     assert state["open_spreads"] == []
     assert trading.submitted == []

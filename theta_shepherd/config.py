@@ -51,12 +51,20 @@ class Settings:
     # pre-NFP flatten — premium that outlives the contest is premium we pay
     # to give back when we cross the spread to exit early.
     last_entry_expiry: date = date(2026, 9, 3)
+    # Measured EV surface (Sep 1, 1-2 DTE, 96 candidates across SPY/QQQ/IWM),
+    # in expected dollars per $10k of risk deployed:
+    #   0.10:196  0.15:218  0.20:258  0.25:218  0.30:113  0.35:-76  0.40:-353
+    # The peak is 0.20 and the edge is gone by 0.35. The old 0.15-0.30 band
+    # spanned the peak but leaned on the weak 0.30 shoulder.
     short_delta_lo: float = 0.15   # |delta| band for the short strike
-    short_delta_hi: float = 0.30   # richer credit; short-DTE still ~70% POP
+    short_delta_hi: float = 0.25   # centred on the measured 0.20 peak
     spread_width: float = 5.0      # dollars between strikes
     # Cheaper underlyings need narrower spreads to keep credit/width viable
     spread_width_overrides: dict[str, float] = field(default_factory=lambda: {"IWM": 3.0})
-    min_credit_frac: float = 0.15  # credit must be >= 15% of width
+    # At the delta-0.20 peak the credit is only ~10.9% of width, so the old
+    # 15% floor filtered out the single most profitable bucket before the
+    # committee ever saw it — leaving the agent trading the 0.25-0.30 shoulder.
+    min_credit_frac: float = 0.08  # credit must be >= 8% of width
     # A book of one direction only is a directional bet, not premium harvest:
     # don't stack more than this many same-kind spreads without the other side.
     max_same_direction_spreads: int = 2
@@ -72,7 +80,14 @@ class Settings:
     max_portfolio_risk: float = _env_float("MAX_PORTFOLIO_RISK", 25_000.0)
     # Risk ladder: portfolio cap starts at the base and earns +step per green
     # day, up to max_portfolio_risk. Risk is a privilege the book pays for.
-    ladder_base_risk: float = _env_float("LADDER_BASE_RISK", 10_000.0)
+    # The ladder earns headroom over time, but the contest horizon is shorter
+    # than the ramp: at +5k/green day from 10k it reaches the 25k ceiling on
+    # Sep 4 — a day after the mandatory flatten kills the book. Risk that
+    # arrives after the deadline is risk never deployed, so start where the
+    # old schedule would have been by mid-week. The circuit breakers that
+    # actually prevent catastrophe (daily loss limit, drawdown kill switch,
+    # 2x stops, pre-NFP flatten) are deliberately untouched.
+    ladder_base_risk: float = _env_float("LADDER_BASE_RISK", 20_000.0)
     ladder_step: float = _env_float("LADDER_STEP", 5_000.0)
     daily_loss_limit: float = _env_float("DAILY_LOSS_LIMIT", 5_000.0)
     max_open_spreads: int = 12
