@@ -1,0 +1,148 @@
+theta_shepherd/stats.py
+  s_6a33750846ac74::t_4a51cc3232fe1d 1-62,65-96,100-134,141-149,154-156,159-186
+  s_6a33750846ac74::t_c3c2040adf0c31 97-99
+  s_6a33750846ac74::t_5714c758545f4c 135-140
+  s_6a33750846ac74::t_948f8bd571e42c 63-64
+  s_6a33750846ac74::t_1651734316d627 150-153,157-158
+README.md
+  s_6a33750846ac74::t_ef55327038b893 83
+  s_6a33750846ac74::t_8d8d70e7345110 141-142,145-151
+  s_6a33750846ac74::t_a402aed68dfdb4 87
+  s_6a33750846ac74::t_ef9f88947efd61 191-194
+  s_6a33750846ac74::t_c249260bd4a1f4 92-95
+  s_6a33750846ac74::t_469779f6b23529 161-163,165-173,176,178-185
+social/submission_form.md
+  s_6a33750846ac74::t_f476f01daeec7c 27-37
+  s_6a33750846ac74::t_068f6d0dd8fc88 3-4
+  s_6a33750846ac74::t_91aa525da764d4 46-53,55
+run_agent.py
+  s_6a33750846ac74::t_271c9ebee6d09a 10
+  s_6a33750846ac74::t_0e5dfb35c9927e 54-57,60-68
+dashboard.py
+  s_6a33750846ac74::t_fade8e4128eda8 17-19
+tests/test_stats.py
+  s_6a33750846ac74::t_5d4cb2a33a47a9 76-77,79-84
+  s_6a33750846ac74::t_5f2fc11c5cb864 1-75,78
+CONTINUE.md
+  s_6a33750846ac74::t_58d137b4d18614 260-287,290-307
+social/posts.md
+  s_6a33750846ac74::t_cb006edbfc4846 94-166,168,170-207
+  s_6a33750846ac74::t_8a6b0f4764112d 5-14
+presentation/slides.md
+  s_6a33750846ac74::t_fe71257ebfc2f5 4-5,22-25,27,46-48,57-58,66-68,71,77-79
+WRITEUP.md
+  s_6a33750846ac74::t_8dc5e2b9fd9d73 12-14,19-25,35-37,41-42,50-56,58-59,81-94
+presentation/video_script.md
+  s_6a33750846ac74::t_7faa3542540bd8 76-77
+  s_6a33750846ac74::t_380cb39417c899 57-70
+  s_6a33750846ac74::t_781dcbeb67aef7 41-42
+  s_6a33750846ac74::t_2a1bfda18ed6cf 23-27
+  s_6a33750846ac74::t_1704b8c69e0d57 85-86
+  s_6a33750846ac74::t_2d9bccc0710a50 3-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "4524d75c0d2c06cce40f41f8814e11749163f1c2",
+  "branch": "main",
+  "prompts": {
+    "s_6a33750846ac74": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "614841e5-91eb-4c76-b96d-bb037089b980",
+        "model": "claude-opus-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:8621373d80f60a0f589a3d3d8a5dbaa51bfdeaabc6c7d3191ce1cba14bf45cc9",
+      "total_additions": 612,
+      "total_deletions": 126,
+      "accepted_lines": 601,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_6a33750846ac74": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "614841e5-91eb-4c76-b96d-bb037089b980",
+        "model": "claude-opus-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:8621373d80f60a0f589a3d3d8a5dbaa51bfdeaabc6c7d3191ce1cba14bf45cc9",
+      "stats": {
+        "total_additions": 612,
+        "total_deletions": 126,
+        "accepted_lines": 601,
+        "overriden_lines": 0,
+        "files": {
+          "CONTINUE.md": {
+            "total_additions": 46,
+            "total_deletions": 3,
+            "accepted_lines": 46,
+            "overriden_lines": 0
+          },
+          "README.md": {
+            "total_additions": 40,
+            "total_deletions": 20,
+            "accepted_lines": 40,
+            "overriden_lines": 0
+          },
+          "WRITEUP.md": {
+            "total_additions": 38,
+            "total_deletions": 17,
+            "accepted_lines": 38,
+            "overriden_lines": 0
+          },
+          "dashboard.py": {
+            "total_additions": 3,
+            "total_deletions": 23,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "presentation/slides.md": {
+            "total_additions": 19,
+            "total_deletions": 15,
+            "accepted_lines": 19,
+            "overriden_lines": 0
+          },
+          "presentation/video_script.md": {
+            "total_additions": 27,
+            "total_deletions": 19,
+            "accepted_lines": 27,
+            "overriden_lines": 0
+          },
+          "run_agent.py": {
+            "total_additions": 15,
+            "total_deletions": 0,
+            "accepted_lines": 15,
+            "overriden_lines": 0
+          },
+          "social/posts.md": {
+            "total_additions": 122,
+            "total_deletions": 6,
+            "accepted_lines": 122,
+            "overriden_lines": 0
+          },
+          "social/submission_form.md": {
+            "total_additions": 21,
+            "total_deletions": 12,
+            "accepted_lines": 21,
+            "overriden_lines": 0
+          },
+          "tests/test_stats.py": {
+            "total_additions": 86,
+            "total_deletions": 2,
+            "accepted_lines": 84,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/stats.py": {
+            "total_additions": 195,
+            "total_deletions": 9,
+            "accepted_lines": 186,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
