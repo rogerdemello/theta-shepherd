@@ -57,6 +57,9 @@ class Settings:
     # Cheaper underlyings need narrower spreads to keep credit/width viable
     spread_width_overrides: dict[str, float] = field(default_factory=lambda: {"IWM": 3.0})
     min_credit_frac: float = 0.15  # credit must be >= 15% of width
+    # A book of one direction only is a directional bet, not premium harvest:
+    # don't stack more than this many same-kind spreads without the other side.
+    max_same_direction_spreads: int = 2
 
     def width_for(self, underlying: str) -> float:
         return self.spread_width_overrides.get(underlying.upper(), self.spread_width)

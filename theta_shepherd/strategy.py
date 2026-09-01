@@ -43,9 +43,19 @@ class SpreadCandidate:
 
     @property
     def expected_value(self) -> float:
-        """Per 1-lot at mid prices, in dollars."""
-        mid_loss = (self.width - self.mid_credit) * 100
-        return self.mid_credit * 100 * self.pop - mid_loss * (1 - self.pop)
+        """Per 1-lot at mid prices, in dollars, under the exit policy we
+        actually run: take profit at `profit_target_frac` of the credit, stop
+        at `stop_loss_mult` x credit.
+
+        This used to model hold-to-expiry with a full-width loss, which the
+        agent never takes — it stops out at 2x credit long before that. Every
+        candidate scored negative as a result, and ranking was biased toward
+        low delta. A stop costs (mult - 1) credits, capped by the true max
+        loss in case the stop is wider than the spread itself."""
+        c = self.mid_credit
+        win = settings.profit_target_frac * c * 100
+        loss = min((settings.stop_loss_mult - 1) * c, self.width - c) * 100
+        return win * self.pop - loss * (1 - self.pop)
 
     @property
     def score(self) -> float:
@@ -210,6 +220,11 @@ def find_candidates(md: MarketData, top_n: int = 8) -> list[SpreadCandidate]:
         calls = md.chain(sym, ContractType.CALL, price, price * 1.15, settings.min_dte, dte_hi)
         candidates += _pair_spreads(puts, "put_credit", price)
         candidates += _pair_spreads(calls, "call_credit", price)
+
+    # Never propose a trade that loses money on its own math. The credit floor
+    # alone doesn't imply positive EV: break-even needs credit >= |delta| x
+    # width, while min_credit_frac only asks for 15% of width.
+    candidates = [c for c in candidates if c.expected_value > 0]
 
     candidates.sort(key=lambda c: c.score, reverse=True)
     # Keep the best candidate per (underlying, kind, expiration) so the LLM

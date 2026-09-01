@@ -53,3 +53,35 @@ def test_entry_gates_ladder_cap_never_exceeds_hard_ceiling():
 def test_entry_gates_veto_thin_credit():
     thin = make_candidate(credit=settings.min_credit_frac * 5.0 - 0.01, width=5.0)
     assert any("min_credit" in v for v in entry_gates(healthy_risk(), thin, 2))
+
+
+# --- directional balance -------------------------------------------------
+# A book of nothing but put credit spreads is net long delta: every leg loses
+# together on a selloff. Diversifying by underlying does not help.
+
+def test_third_same_direction_spread_vetoed_without_the_other_side():
+    risk = healthy_risk(open_spreads=3,
+                        open_kinds=("put_credit", "put_credit", "put_credit"))
+    violations = entry_gates(risk, make_candidate(kind="put_credit"), qty=2)
+    assert any("directional_balance" in v for v in violations)
+
+
+def test_same_direction_allowed_once_the_other_side_exists():
+    risk = healthy_risk(open_spreads=3,
+                        open_kinds=("put_credit", "put_credit", "call_credit"))
+    assert entry_gates(risk, make_candidate(kind="put_credit"), qty=2) == []
+
+
+def test_opposite_direction_always_allowed_through_the_balance_gate():
+    """The gate must never block the trade that would rebalance the book."""
+    risk = healthy_risk(open_spreads=3,
+                        open_kinds=("put_credit", "put_credit", "put_credit"))
+    violations = entry_gates(risk, make_candidate(kind="call_credit"), qty=2)
+    assert not any("directional_balance" in v for v in violations)
+
+
+def test_second_same_direction_spread_still_fine():
+    """The gate bites on the third, not the second — two a side is a book,
+    three with no offset is a directional bet."""
+    risk = healthy_risk(open_spreads=1, open_kinds=("put_credit",))
+    assert entry_gates(risk, make_candidate(kind="put_credit"), qty=2) == []

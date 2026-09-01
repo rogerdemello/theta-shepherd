@@ -15,6 +15,7 @@ class AccountRisk:
     day_pnl: float
     open_spreads: int
     committed_risk: float  # sum of max_loss across open spreads (from state)
+    open_kinds: tuple[str, ...] = ()  # "put_credit"/"call_credit" per open spread
 
 
 def account_risk(trading: TradingClient, state: dict) -> AccountRisk:
@@ -27,6 +28,7 @@ def account_risk(trading: TradingClient, state: dict) -> AccountRisk:
         day_pnl=day_pnl,
         open_spreads=len(spreads),
         committed_risk=sum(s["max_loss_total"] for s in spreads),
+        open_kinds=tuple(s.get("kind", "") for s in spreads),
     )
 
 
@@ -60,6 +62,19 @@ def entry_gates(risk: AccountRisk, candidate: SpreadCandidate, qty: int,
         )
     if candidate.credit < settings.min_credit_frac * candidate.width:
         violations.append("min_credit: credit below floor at submission time")
+    # Directional balance. A book of nothing but put credit spreads is net long
+    # delta — a levered bet that the market stops falling, which is not the
+    # market-neutral premium harvest this agent claims to run. Diversifying by
+    # underlying (QQQ -> IWM) does nothing here; every leg still loses together
+    # on a selloff. Require the other side before stacking more of one.
+    same = sum(1 for k in risk.open_kinds if k == candidate.kind)
+    opposite = "call_credit" if candidate.kind == "put_credit" else "put_credit"
+    if (same >= settings.max_same_direction_spreads
+            and opposite not in risk.open_kinds):
+        violations.append(
+            f"directional_balance: {same} {candidate.kind} open and no "
+            f"{opposite} to offset"
+        )
     return violations
 
 
