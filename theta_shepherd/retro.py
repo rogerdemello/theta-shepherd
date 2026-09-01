@@ -72,14 +72,19 @@ def run_retro(day: date | None = None) -> str:
     if not events:
         return ""
 
-    result = chat_json(
-        azure_client(), RETRO_PROMPT,
-        json.dumps({"date": day.isoformat(), "journal": events}, indent=1),
-        temperature=0.3,
-    )
-    lessons = [str(x) for x in result.get("lessons", [])]
-    keep = [str(x) for x in result.get("keep_doing", [])]
-    summary = result.get("summary", result.get("_error", ""))
+    # This runs once a night. A transient model hiccup costs a whole day of
+    # learning and isn't retried until tomorrow, so pay for one retry here.
+    payload = json.dumps({"date": day.isoformat(), "journal": events}, indent=1)
+    for attempt in range(2):
+        result = chat_json(azure_client(), RETRO_PROMPT, payload, temperature=0.3)
+        lessons = [str(x) for x in result.get("lessons", [])]
+        keep = [str(x) for x in result.get("keep_doing", [])]
+        summary = result.get("summary", result.get("_error", ""))
+        if lessons or summary:
+            break
+        log_event("retro_retry", {"date": day.isoformat(), "attempt": attempt + 1})
+    else:
+        return ""
     if not lessons and not summary:
         return ""
 

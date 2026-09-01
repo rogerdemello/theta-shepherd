@@ -73,7 +73,20 @@ def main() -> None:
         from theta_shepherd.retro import run_retro
         day = None if args.retro == "today" else date.fromisoformat(args.retro)
         section = run_retro(day)
-        console.print(section or "[yellow]No journal events for that day — nothing to learn.[/]")
+        if section:
+            console.print(section)
+            return
+        # An empty section means either "nothing happened" or "the model gave
+        # us nothing" — reporting both as the former hid a real failure on
+        # Sep 1, when the journal held 88 events.
+        from datetime import datetime, timezone
+
+        from theta_shepherd.retro import read_journal
+        if read_journal(day or datetime.now(timezone.utc).date()):
+            console.print("[red]Retro FAILED: journal had events but the model "
+                          "returned no lessons (retried once).[/]")
+            raise SystemExit(1)
+        console.print("[yellow]No journal events for that day — nothing to learn.[/]")
         return
     if args.flatten:
         from theta_shepherd.agent import run_flatten
