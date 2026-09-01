@@ -173,6 +173,35 @@ both commit+push within seconds; the loser's push was rejected, so both now reba
 
 **99 tests green.**
 
+## Done Tue Sep 1 (pre-open) ✅ — P&L tuning off the measured EV surface
+
+User: "make it the best, most profit out of all." Measured rather than guessed — 96 live
+candidates (SPY/QQQ/IWM, 1–2 DTE), expected dollars per **$10k of risk deployed**:
+
+| delta | 0.10 | 0.15 | **0.20** | 0.25 | 0.30 | 0.35 | 0.40 | 0.45 |
+|---|---|---|---|---|---|---|---|---|
+| $/10k | 196 | 218 | **258** | 218 | 113 | −76 | −353 | −598 |
+
+- **The credit floor was excluding the peak.** At delta 0.20 credit is ~10.9% of width, under
+  the old `min_credit_frac = 0.15`. The agent was structurally confined to the 0.25–0.30
+  shoulder. Floor → **0.08**, band → **0.15–0.25**. Edge is gone entirely past 0.35.
+- **Ladder matched to the horizon.** +$5k/green day from $10k reaches the $25k ceiling on Sep 4,
+  a day *after* the flatten — risk that arrives after the deadline is never deployed.
+  `ladder_base_risk` → **$20k**; with the green-day step the live cap is now **$25k** vs $8.6k
+  committed.
+
+Result: 5 → 8 candidates, top score 0.034 → 0.036, deltas 0.227–0.294 → **0.175–0.218**, POP
+0.70–0.77 → **0.78–0.825**. Better EV per dollar *and* a higher win rate.
+
+⚠️ **Risk posture is now deliberately aggressive** — up to $25k of defined risk (25% of the
+account) at the user's explicit direction. The circuit breakers are untouched and are what
+bound the downside: $5k daily loss limit, 5% drawdown kill switch, 2× credit stops every
+20 min, mandatory Sep 3 flatten. Realistic bad day ≈ −$3k (all spreads stopping at 2×), not
+−$25k, since max loss requires gapping through both legs with no stop fill.
+
+Dry run confirmed end-to-end: would open a SPY call spread to rebalance, directional gate
+vetoing two put spreads, exits all holding. **99 tests green.**
+
 ## Still TODO
 
 - ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.
