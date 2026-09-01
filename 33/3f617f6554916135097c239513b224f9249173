@@ -1,0 +1,87 @@
+theta_shepherd/config.py
+  s_da48a52d9cc7dc::t_ac0f6495a324f4 60-62
+theta_shepherd/strategy.py
+  s_da48a52d9cc7dc::t_29da340da700a1 46-58
+  s_da48a52d9cc7dc::t_8f8eb613aa9ef0 224-228
+theta_shepherd/risk.py
+  s_da48a52d9cc7dc::t_505293893a9eb2 18
+  s_da48a52d9cc7dc::t_aeb55f99d7f5f7 65-77
+  s_da48a52d9cc7dc::t_eb6d9dc984b278 31
+tests/test_strategy.py
+  s_da48a52d9cc7dc::t_7d963e9297fb6d 14-28,39-40
+  s_da48a52d9cc7dc::t_f74a80b6c17783 29-38
+  s_da48a52d9cc7dc::t_8f70a19fe9a608 4
+tests/test_risk.py
+  s_da48a52d9cc7dc::t_cca7226f2aab8e 56-82,87
+  s_da48a52d9cc7dc::t_7feab8282e6011 83-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "1.6.9",
+  "base_commit_sha": "333f617f6554916135097c239513b224f9249173",
+  "branch": "main",
+  "prompts": {
+    "s_da48a52d9cc7dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e5e2e7d-5f3f-4e27-9d58-f9380029ec1a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:31bbad2765937b112a9af3d9782c1321bac5e1babd5c4f6414669240f3c446fe",
+      "total_additions": 101,
+      "total_deletions": 12,
+      "accepted_lines": 96,
+      "overriden_lines": 0
+    }
+  },
+  "sessions": {
+    "s_da48a52d9cc7dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3e5e2e7d-5f3f-4e27-9d58-f9380029ec1a",
+        "model": "claude-opus-5"
+      },
+      "human_author": "rogerdemello <rogerdemello289@gmail.com>",
+      "messages_url": "cas:31bbad2765937b112a9af3d9782c1321bac5e1babd5c4f6414669240f3c446fe",
+      "stats": {
+        "total_additions": 101,
+        "total_deletions": 12,
+        "accepted_lines": 96,
+        "overriden_lines": 0,
+        "files": {
+          "tests/test_risk.py": {
+            "total_additions": 34,
+            "total_deletions": 2,
+            "accepted_lines": 32,
+            "overriden_lines": 0
+          },
+          "tests/test_strategy.py": {
+            "total_additions": 31,
+            "total_deletions": 7,
+            "accepted_lines": 28,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/config.py": {
+            "total_additions": 3,
+            "total_deletions": 0,
+            "accepted_lines": 3,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/risk.py": {
+            "total_additions": 15,
+            "total_deletions": 0,
+            "accepted_lines": 15,
+            "overriden_lines": 0
+          },
+          "theta_shepherd/strategy.py": {
+            "total_additions": 18,
+            "total_deletions": 3,
+            "accepted_lines": 18,
+            "overriden_lines": 0
+          }
+        }
+      }
+    }
+  }
+}
