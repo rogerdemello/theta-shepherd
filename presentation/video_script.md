@@ -1,7 +1,8 @@
 # Theta Shepherd — 3-minute video script
 
-> Record after Sep 3 flatten. Fill every 【】 with final numbers.
-> Screen recording + voiceover; keep cuts fast. Target 2:50.
+> Record after the Sep 3 flatten. Fill every 【】 from
+> `python run_agent.py --stats`. Screen recording + voiceover; keep cuts
+> fast. Target 2:50.
 
 ---
 
@@ -19,11 +20,11 @@
 
 **Show:** slide 3 (architecture), cursor tracing the flow.
 
-> "Theta Shepherd sells defined-risk options credit spreads on SPY and QQQ —
-> boring, high-probability theta harvesting. Every 20 minutes a quant engine
-> scans Alpaca's option chains, builds delta-targeted spreads, and ranks them
-> by expected value. But the quant engine doesn't decide. Neither does one AI.
-> A committee does."
+> "Theta Shepherd sells defined-risk options credit spreads on SPY, QQQ and
+> IWM — boring, high-probability theta harvesting. Every 20 minutes a quant
+> engine scans Alpaca's option chains, builds delta-targeted spreads, and
+> ranks them by expected value under the exit policy it actually runs. But
+> the quant engine doesn't decide. Neither does one AI. A committee does."
 
 ## 0:50–1:30 — The committee (dashboard debate viewer)
 
@@ -37,7 +38,8 @@
 > the Macro Analyst killed it, because it expired right after the ISM print.
 > No trade. Every debate is journaled and replayable. And when all three
 > agree on market direction — which is rare by design — the agent is allowed
-> one small directional bet: the satellite sleeve, capped at $2,000 of risk."
+> one small directional bet: the satellite sleeve, capped at four thousand
+> dollars of risk, with the engine re-checking that unanimity itself."
 
 ## 1:30–2:00 — The shepherd learns (lessons.md diff / dashboard lessons panel)
 
@@ -52,22 +54,27 @@
 ## 2:00–2:30 — Guardrails + full Alpaca stack (terminal + MCP)
 
 **Show:** terminal: one live cycle running; then Claude answering "how is the
-flock doing?" via the Alpaca MCP server; a pytest run (62 green).
+flock doing?" via the Alpaca MCP server; a pytest run (130 green).
 
-> "Above every AI sits pure Python the models can't override: a per-trade
-> cap, a risk ladder that starts at four thousand dollars and earns headroom
-> only on green days, a daily loss circuit breaker, a drawdown kill switch,
-> and a hard-coded flatten before nonfarm payrolls. It's all Alpaca, end to
-> end — atomic multi-leg orders on the Trading API, Greeks from Market Data,
-> the CLI for journaled ops snapshots, and the MCP server so a human can ask
-> Claude how the flock is doing while the agent works."
+> "Above every AI sits pure Python the models can't override: a four-thousand
+> dollar per-trade cap, a risk ladder that only earns headroom on green days,
+> a rule that the book can't go one-way on delta, a daily loss circuit
+> breaker, a drawdown kill switch, and a hard-coded flatten before nonfarm
+> payrolls. It runs unattended on a schedule, which means the real engineering
+> is what happens when something breaks at midnight: every order is on disk
+> before the next one goes out, one bad quote can't cost the rest of the book
+> its stops, and the agent never replaces an order whose cancel hasn't
+> settled. It's all Alpaca, end to end — atomic multi-leg orders on the
+> Trading API, Greeks from Market Data, the CLI for journaled ops snapshots,
+> and the MCP server so a human can ask Claude how the flock is doing while
+> the agent works."
 
 ## 2:30–2:50 — Close (final dashboard + numbers slide)
 
 **Show:** slide 7 (results), then repo URL.
 
-> "Final tally: 【N】 trades, 【N】 committee debates, 【$XXX】 collected,
-> 【win rate】, maximum drawdown 【X%】 — and an equity curve that was flat
+> "Final tally: 【N】 spreads closed, 【N】 committee debates, 【$X,XXX】 of
+> premium collected, 【win rate】, maximum drawdown 【X.XX%】 — and an equity curve that was flat
 > and green before the market's biggest event of the week. The best trade of
 > the week was the one the committee argued itself out of.
 > Theta Shepherd — github.com/rogerdemello/theta-shepherd."
@@ -75,4 +82,5 @@ flock doing?" via the Alpaca MCP server; a pytest run (62 green).
 ---
 
 **B-roll checklist:** dashboard (light + dark), debate card, lessons diff,
-terminal cycle, MCP conversation, pytest run, Alpaca web dashboard equity.
+terminal cycle, MCP conversation, pytest run, `--stats` tally, `--preflight`
+GO table, Alpaca web dashboard equity.

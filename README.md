@@ -80,16 +80,19 @@ flowchart TB
 
 | Module | Role |
 |---|---|
-| `theta_shepherd/strategy.py` | Builds 1–7 DTE vertical credit spreads (short strike at 0.12–0.25 delta, EV-ranked) and the satellite sleeve's directional debit spreads |
+| `theta_shepherd/strategy.py` | Builds 1–7 DTE vertical credit spreads (short strike at 0.15–0.25 delta, EV-ranked, negative-EV and illiquid legs dropped) and the satellite sleeve's directional debit spreads |
 | `theta_shepherd/committee.py` | The Trading Committee: Macro Analyst, Vol Trader, Risk Officer vote independently; the Chair synthesizes. Full debate journaled |
 | `theta_shepherd/retro.py` | Nightly retrospective: LLM distills the day's journal into `journal/lessons.md`, injected into the next day's committee prompts |
 | `theta_shepherd/llm.py` | Shared Azure OpenAI plumbing + single-gatekeeper fallback |
-| `theta_shepherd/risk.py` | Hard gates: per-trade risk cap, laddered portfolio risk cap ($10k base, +$5k per green day, $25k ceiling), daily loss limit, max open spreads |
+| `theta_shepherd/risk.py` | Hard gates: per-trade risk cap, laddered portfolio risk cap ($20k base, +$5k per green day, $25k ceiling), directional balance, daily loss limit, max open spreads |
 | `theta_shepherd/econ_calendar.py` | Tier-1 macro calendar: entry blackouts around releases, mandatory pre-NFP flatten |
 | `theta_shepherd/execution.py` | Atomic MLEG limit orders (negative limit = credit) via `alpaca-py` |
 | `theta_shepherd/market.py` | Option chains with Greeks/IV, quotes, Benzinga news via Market Data API |
 | `theta_shepherd/cli_ops.py` | `alpaca-cli` account & positions snapshots journaled every cycle |
-| `theta_shepherd/journal.py` | Append-only JSONL decision journal + open-spread state |
+| `theta_shepherd/journal.py` | Append-only JSONL decision journal + atomic open-spread state |
+| `theta_shepherd/resilience.py` | Retry-with-backoff for idempotent broker/market-data reads (never for order submission) |
+| `theta_shepherd/preflight.py` | 9-point go/no-go check + self-healing health watchdog |
+| `theta_shepherd/stats.py` | Contest tally computed from the journal (`--stats`) |
 
 ## Setup
 
@@ -135,13 +138,17 @@ claude mcp add alpaca --transport stdio -- uvx alpaca-mcp-server --env-file /pat
 .\.venv\Scripts\python.exe run_agent.py --flatten  # close everything now
 .\.venv\Scripts\python.exe run_agent.py --preflight # 9-point go/no-go check
 .\.venv\Scripts\python.exe run_agent.py --health   # watchdog: self-heal a dead schedule
-python -m pytest tests/                            # 84 tests, no network needed
+.\.venv\Scripts\python.exe run_agent.py --stats    # contest tally from the journal
+python -m pytest tests/                            # 130 tests, no network needed
 ```
 
-Ops safety: state writes are atomic with a `.bak` fallback, a cycle lockfile
-prevents overlapping runs from double-submitting, exit orders escalate their
-price pad until stops fill, and `touch STOP` in the repo root halts new
-entries (exits keep managing) — delete it to resume.
+Ops safety: state writes are atomic with a `.bak` fallback, every submitted
+order is persisted before the next API call, a cycle lockfile prevents
+overlapping runs from double-submitting, each spread is reconciled and exited
+independently so one bad quote can't cost the rest of the book its stops,
+cancels are confirmed settled before any reprice or re-close, exit orders
+escalate their price pad until stops fill, and `touch STOP` in the repo root
+halts new entries (exits keep managing) — delete it to resume.
 
 **Architecture shape:** the backend is a headless scheduled service (four
 Windows scheduled tasks: trading cycles, nightly retro, self-healing health
@@ -151,27 +158,40 @@ rebuilt from the journal and pushed to GitHub Pages every 30 minutes during
 the session and after every close. No live server means the demo URL has
 100% uptime regardless of whether the trading machine is even on.
 
-```powershell
-```
-
-To run unattended on Windows, register the two scheduled tasks (paths are in the
-committed `scheduler_*.bat` wrappers — adjust to your checkout):
+To run unattended on Windows, register the four tasks against the committed
+`scheduler_*.bat` wrappers (adjust paths to your checkout):
 
 ```powershell
-# a decision cycle every 20 min during the US session (agent no-ops when closed)
-schtasks /create /tn "ThetaShepherd Cycle" /tr "C:\path\to\scheduler_cycle.bat" `
-  /sc weekly /d MON,TUE,WED,THU,FRI /st 19:00 /ri 20 /du 06:30
-# the nightly retrospective shortly after the close
-schtasks /create /tn "ThetaShepherd Retro" /tr "C:\path\to\scheduler_retro.bat" `
-  /sc weekly /d TUE,WED,THU,FRI,SAT /st 01:45
+$action  = New-ScheduledTaskAction -Execute "C:\path\to\scheduler_cycle.bat"
+$trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Mon,Tue,Wed,Thu,Fri -At 19:00
+$trigger.Repetition = (New-ScheduledTaskTrigger -Once -At 19:00 `
+  -RepetitionInterval (New-TimeSpan -Minutes 20) `
+  -RepetitionDuration (New-TimeSpan -Hours 6 -Minutes 30)).Repetition
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
+  -DontStopIfGoingOnBatteries -StartWhenAvailable
+Register-ScheduledTask -TaskName "ThetaShepherd Cycle" -Action $action `
+  -Trigger $trigger -Settings $settings
 ```
+
+Two traps this project hit, both now checked by `--preflight`:
+
+- **Never register with `schtasks /tr "<path with spaces>"`** — it stores the
+  path unquoted and every run dies `0x80070002`. Wrapping in `cmd.exe /c` is
+  not the fix either (`0xC000013A`); point the action at the `.bat` directly.
+- **`DisallowStartIfOnBatteries` is the default**, which leaves every task
+  `Queued` forever on an unplugged laptop. Registration is not readiness.
+
+Each task writes its own `journal/scheduler_<task>.log`: two tasks appending
+to one file kills the loser of the race with exit 1 and no output at all.
 
 ## Strategy in one paragraph
 
 Sell out-of-the-money vertical credit spreads (put side and call side; both sides on
 one expiry form an iron condor) on SPY/QQQ/IWM at 1–7 days to expiry, short strike in
-the 0.15–0.30 delta band ($5 wide, $3 on IWM), only when the credit is ≥ 15% of width
-— and **never expiring after the pre-NFP flatten**: premium that outlives the contest
+the 0.15–0.25 delta band ($5 wide, $3 on IWM) — centred on the measured EV peak at
+0.20 delta, where the credit is only ~11% of width, so the ranking is done on expected
+value rather than a credit-to-width rule of thumb, and negative-EV candidates never
+reach the committee — and **never expiring after the pre-NFP flatten**: premium that outlives the contest
 is premium paid back crossing the spread to exit. Exit at 50% of max profit, stop out
 if the spread doubles against us; expiry-day spreads ride the morning's accelerated
 decay and are hard-closed from 2 PM ET. The committee decides *whether* and *which* —

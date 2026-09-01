@@ -1,7 +1,8 @@
 # Theta Shepherd — 7-slide deck
 
 > Build in Google Slides / PowerPoint from this outline. One idea per slide,
-> big type, dashboard screenshots as backgrounds. Fill 【】 after Sep 3.
+> big type, dashboard screenshots as backgrounds.
+> Fill 【】 on Sep 4 from `python run_agent.py --stats`.
 
 ---
 
@@ -18,11 +19,12 @@ Paper account PA31OBPWA7MW · github.com/rogerdemello/theta-shepherd
 
 ## Slide 2 — The strategy (one sentence each)
 
-- **Sell** defined-risk credit spreads on SPY/QQQ — 1–7 DTE, short strike at
-  0.12–0.25 delta, $5 wide, credit ≥ 15% of width
-- **Exit** mechanically: +50% profit target, 2× credit stop, never hold to expiry day
+- **Sell** defined-risk credit spreads on SPY / QQQ / IWM — 1–7 DTE, short strike
+  at 0.15–0.25 delta ($5 wide; $3 on IWM), ranked by EV per dollar of risk
+- **Exit** mechanically: +50% profit target, 2× credit stop, never the
+  final-hours gamma on expiry day
 - **Edge** isn't the spread — it's discipline: what the agent *refuses* to do
-- Satellite sleeve: one ≤$2k directional debit spread, only on unanimous AI conviction
+- Satellite sleeve: one ≤$4k directional debit spread, only on unanimous AI conviction
 
 ---
 
@@ -41,8 +43,9 @@ Callout: **the LLM can size down or veto — it can never loosen a limit.**
 - Macro Analyst · Vol Trader · Risk Officer — independent calls, no anchoring
 - Chair synthesizes; Risk Officer's veto weighs heaviest; zero trades is a valid ruling
 - Every debate journaled + replayable on the dashboard
-- Real example on screen: Vol Trader approves SPY put spread → Macro Analyst
-  vetoes (ISM release) → no trade
+- Real example on screen: the Risk Officer refused to add QQQ (concentration) and
+  the committee bought IWM instead — the diversification wasn't in my code, it
+  was in the argument
 
 ---
 
@@ -51,7 +54,8 @@ Callout: **the LLM can size down or veto — it can never loosen a limit.**
 - Nightly retrospective LLM reads the day's full decision journal
 - Writes falsifiable lessons ("start put spreads nearer mid — fill needed 2 reprices")
 - Lessons injected into the next day's committee prompts
-- Monday's mistakes are Tuesday's rules
+- Monday's mistakes are Tuesday's rules — on Sep 1 the retro flagged the book's
+  one-way delta before I did
 
 ---
 
@@ -59,20 +63,20 @@ Callout: **the LLM can size down or veto — it can never loosen a limit.**
 
 | Guardrail | Alpaca stack |
 |---|---|
-| $2k per-trade cap | Trading API — atomic MLEG spreads |
-| Risk ladder $4k → $10k (green days only) | Market Data — chains, Greeks, news |
-| Daily loss circuit breaker · 5% kill switch | CLI — journaled ops + Greeks spot-checks |
+| $4k per-trade cap · 12 spreads max | Trading API — atomic MLEG spreads |
+| Risk ladder → $25k, earned on green days only | Market Data — chains, Greeks, news |
+| Daily loss breaker · 5% kill switch · STOP file | CLI — journaled ops + Greeks spot-checks |
 | Econ-calendar blackouts · **pre-NFP flatten** | MCP server — human overseer via Claude |
 
-62 pytest tests · append-only JSONL audit trail · MIT
+130 pytest tests · 9-point preflight · append-only JSONL audit trail · MIT
 
 ---
 
 ## Slide 7 — Results (screenshot: final dashboard, equity curve hero)
 
-- Final P&L: 【+$XXX】 (【X.XX%】 on $100k) · max drawdown 【X%】
-- 【N】 spreads traded · 【N】% wins · 【$XXX】 premium collected
-- 【N】 committee debates · 【N】 vetoes · 【N】 lessons learned
+- Final P&L: 【+$XXX】 (【X.XX%】 on $100k) · max drawdown 【X.XX%】
+- 【N】 spreads closed · 【N】% wins · 【$X,XXX】 premium collected
+- 【N】 committee debates · 【N】 no-trade rulings · 【N】 hard-gate vetoes · 【N】 retrospectives
 - **Flat and green before NFP — by design, decided on day 0**
 
 *"The best trade of the week was the one the committee argued itself out of."*

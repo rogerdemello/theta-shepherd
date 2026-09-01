@@ -14,31 +14,11 @@ from pathlib import Path
 
 from theta_shepherd.config import settings
 from theta_shepherd.journal import load_state
+# One journal reader for the dashboard and the contest tally: two readers
+# would eventually disagree about what counts as a trade.
+from theta_shepherd.stats import read_all_events
 
 ACCOUNT_ID = "PA31OBPWA7MW"
-
-
-def _normalize(e: dict) -> dict:
-    """Adapt first-session records written before the event-key fix: they used
-    'kind' as the event name, and order submissions had it clobbered by the
-    candidate's own kind (call_credit/put_credit)."""
-    if "event" not in e and "kind" in e:
-        if e["kind"] in ("call_credit", "put_credit") and "order_id" in e:
-            e["event"] = "order_submitted"
-        else:
-            e["event"] = e["kind"]
-    return e
-
-
-def read_all_events() -> list[dict]:
-    events = []
-    for path in sorted(settings.journal_dir.glob("*.jsonl")):
-        for line in path.read_text(encoding="utf-8").splitlines():
-            try:
-                events.append(_normalize(json.loads(line)))
-            except json.JSONDecodeError:
-                continue
-    return events
 
 
 def live_account() -> dict | None:

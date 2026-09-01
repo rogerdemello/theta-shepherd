@@ -7,6 +7,7 @@
   python run_agent.py --retro    # nightly retrospective: journal -> lessons.md
   python run_agent.py --preflight  # go/no-go operational checks
   python run_agent.py --health     # watchdog: run a cycle if the schedule died
+  python run_agent.py --stats      # contest tally for the submission docs
 """
 
 import argparse
@@ -50,7 +51,21 @@ def main() -> None:
     parser.add_argument("--preflight", action="store_true", help="go/no-go operational checks")
     parser.add_argument("--health", action="store_true",
                         help="watchdog: run a cycle now if the schedule went stale")
+    parser.add_argument("--stats", action="store_true",
+                        help="contest tally from the journal (fills the submission docs)")
+    parser.add_argument("--stats-out", metavar="PATH",
+                        help="with --stats: also write the report to a file")
     args = parser.parse_args()
+
+    if args.stats:
+        from theta_shepherd.stats import run_stats
+        report = run_stats()
+        print(report)
+        if args.stats_out:
+            from pathlib import Path
+            Path(args.stats_out).write_text(report, encoding="utf-8")
+            console.print(f"[green]wrote {args.stats_out}[/]")
+        return
 
     if args.preflight:
         import sys

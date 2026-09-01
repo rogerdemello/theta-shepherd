@@ -257,11 +257,54 @@ without anyone noticing until morning. **123 tests green** (+24 in
     hibernate are disabled on AC; currently both 0 ✓. The residual risk is
     still manual sleep / lid close / unplugging.
 
+## Done Tue Sep 1 (pre-open) ✅ — submission deliverables completed
+
+Everything that can be finished before the numbers exist is finished. **130 tests green.**
+
+- **`--stats`** (`theta_shepherd/stats.py`): the contest tally computed from the
+  journal — equity, total/realized P&L, premium collected, max drawdown, wins/losses,
+  win rate, best/worst trade, cycles, debates, approvals, no-trade rulings, hard-gate
+  vetoes, blackouts, flattens, kill-switch trips, retrospectives written. Prints a
+  markdown block whose values map 1:1 onto the 【】 in every submission doc
+  (`--stats-out PATH` to save). Hand-counting trades out of a 1,000-line JSONL at
+  6 PM on deadline day is how a submission ends up contradicting its own audit trail.
+  `dashboard.py` now imports its journal reader from here — one reader, not two.
+- **Every submission doc synced to what the agent actually does.** WRITEUP, slides,
+  video script, submission form and README all carried numbers from earlier configs
+  ($2k per-trade, $4k→$10k ladder, 0.12–0.25 delta, "credit ≥ 15% of width", 62/69/84
+  tests, SPY+QQQ only, $2k satellite). All corrected, plus the reliability story added
+  (it is half the "technical implementation" score).
+- **README fixed a trap it was teaching**: the setup section told readers to register
+  scheduled tasks with `schtasks /tr "<path with spaces>"` — the exact bug that killed
+  the agent for two hours on day 1. Now `Register-ScheduledTask -Execute` with the
+  battery flags, both traps documented, plus the per-task log-file rule. Also removed
+  an empty code fence and documented all four tasks (it said "the two").
+- **Social posts 3, 4 and 5 written** (X + LinkedIn each): the self-audit story
+  (retro found the one-way-delta book), the flatten-before-NFP story, and the results
+  post. Posts 1–2 carry a header note that they quote day-0 limits — refresh or post
+  as a snapshot.
+- Dashboard regenerated; cover image needs no change (no numbers on it).
+
 ## Still TODO
 
-- ~~Featherless persona~~ — user declined (no API). Code stays dormant (activates only if a key ever lands in .env); all claims scrubbed from WRITEUP/submission form. Committee is Azure-only.
-- Mon–Wed: daily verify fills / regenerate+push dashboard (Pages) / post; Wed flatten check; Thu video+slides+writeup+regenerate keys+submit
-- User actions pending: post #1 and #2 on X/LinkedIn; delete the two private dashboard artifacts at claude.ai/code/artifacts
+**Blocked on the market / the calendar (nothing to do now):**
+- Tue–Wed: agent trades autonomously; verify fills, dashboard auto-publishes every
+  30 min. Wed Sep 3: **verify the 15:30 ET flatten actually fired** and the book is flat.
+- Thu Sep 4: run `--stats`, paste the numbers into WRITEUP / slides 7 / video close /
+  submission form (search for 【 ), record the video, build the deck, submit.
+
+**Only you can do these:**
+- Post #1–#5 on X/LinkedIn (drafts ready in `social/posts.md`) and collect the links
+- Record the 3-min video (script timed in `presentation/video_script.md`) and build
+  the 7 slides (outline in `presentation/slides.md`)
+- **Regenerate the Alpaca + Azure keys before submitting** — the current ones passed
+  through chat
+- Delete the two private dashboard artifacts at claude.ai/code/artifacts
+- Keep the laptop plugged in and awake during 19:00–01:30 IST (preflight now verifies
+  idle sleep/hibernate are off, but it cannot stop a lid close)
+
+**Declined:** ~~Featherless persona~~ — no API key. Code stays dormant (activates only
+if a key ever lands in `.env`); all claims scrubbed from the docs. Committee is Azure-only.
 
 ## Done ✅ (Fri Aug 28)
 
